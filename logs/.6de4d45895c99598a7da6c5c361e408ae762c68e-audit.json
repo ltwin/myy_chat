@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/root/workspace/learning/go_ts_web/logs/.6de4d45895c99598a7da6c5c361e408ae762c68e-audit.json",
+    "files": [
+        {
+            "date": 1762246595447,
+            "name": "/root/workspace/learning/go_ts_web/logs/mcp-puppeteer-2025-11-04.log",
+            "hash": "9a2c4757a43abe1914867ad333a6b852ed373a7782faa0897155ad4605cde9ca"
+        }
+    ],
+    "hashType": "sha256"
+}
