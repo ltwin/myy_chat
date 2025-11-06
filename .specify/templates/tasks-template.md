@@ -21,9 +21,19 @@ description: "Task list template for feature implementation"
 ## Path Conventions
 
 - **Single project**: `src/`, `tests/` at repository root
-- **Web app**: `backend/src/`, `frontend/src/`
+- **Web app**: `backend/golang/src/`, `backend/python/src/`, `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
 - Paths shown below assume single project - adjust based on plan.md structure
+
+## MyY Chat Constitution Quality Tasks
+
+Each implementation phase MUST include:
+
+- **Testing Tasks**: Unit tests, Integration tests, Coverage verification (≥70%)
+- **Documentation Tasks**: API docs, Design docs, Operation manuals
+- **Security Tasks**: Static analysis, Security review, Concurrency verification
+- **Deployment Tasks**: Docker Compose config, Kubernetes manifests, Config switching
+- **Code Quality Tasks**: Chinese comments, English logging, Code reviews
 
 <!-- 
   ============================================================================
@@ -48,9 +58,12 @@ description: "Task list template for feature implementation"
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project structure per implementation plan
+- [ ] T001 Create project structure per implementation plan (backend/golang, backend/python, frontend)
 - [ ] T002 Initialize [language] project with [framework] dependencies
 - [ ] T003 [P] Configure linting and formatting tools
+- [ ] T004 [P] Setup testing framework for ≥70% coverage requirement
+- [ ] T005 [P] Configure static code analysis and security scanning
+- [ ] T006 [P] Setup Chinese comment and English logging standards
 
 ---
 
@@ -62,12 +75,14 @@ description: "Task list template for feature implementation"
 
 Examples of foundational tasks (adjust based on your project):
 
-- [ ] T004 Setup database schema and migrations framework
-- [ ] T005 [P] Implement authentication/authorization framework
-- [ ] T006 [P] Setup API routing and middleware structure
-- [ ] T007 Create base models/entities that all stories depend on
-- [ ] T008 Configure error handling and logging infrastructure
-- [ ] T009 Setup environment configuration management
+- [ ] T007 Setup database schema and migrations framework
+- [ ] T008 [P] Implement authentication/authorization framework
+- [ ] T009 [P] Setup gRPC + Protobuf service communication (Kratos framework)
+- [ ] T010 [P] Setup RESTful API routing and middleware structure
+- [ ] T011 Create base models/entities that all stories depend on
+- [ ] T012 Configure error handling and English logging infrastructure
+- [ ] T013 Setup environment configuration management (Docker Compose/K8s switching)
+- [ ] T014 [P] Setup deployment configurations (docker-compose.yml, k8s manifests)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 

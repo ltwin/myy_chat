@@ -85,10 +85,18 @@
 ### Functional Requirements
 
 - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
-- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]  
+- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
+
+### Quality Requirements (MyY Chat Constitution)
+
+- **QR-001**: System MUST achieve ≥70% test coverage per microservice
+- **QR-002**: System MUST use gRPC + Protobuf for service communication
+- **QR-003**: System MUST support both Docker Compose and Kubernetes deployment
+- **QR-004**: Code MUST include Chinese comments and English logging
+- **QR-005**: System MUST follow RESTful standards for external APIs
 
 *Example of marking unclear requirements:*
 

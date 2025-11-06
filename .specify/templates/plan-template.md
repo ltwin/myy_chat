@@ -31,7 +31,42 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+### MyY Chat Constitution Gates
+
+**代码质量原则 Gates:**
+- [ ] Testing strategy ensures ≥70% test coverage per microservice
+- [ ] Security risks, concurrency, and idempotency addressed in design
+- [ ] Static code analysis tools configured
+
+**API规范原则 Gates:**
+- [ ] Service communication uses gRPC + Protobuf (Kratos framework)
+- [ ] External APIs follow RESTful standards
+- [ ] API documentation plan included
+
+**部署原则 Gates:**
+- [ ] Docker Compose configuration for development/single-machine
+- [ ] Kubernetes manifests for cloud-native deployment
+- [ ] Configuration switching mechanism designed
+
+**设计原则 Gates:**
+- [ ] Object-oriented design principles followed (LSP, DIP, etc.)
+- [ ] Design patterns justified, not over-engineered
+- [ ] Single responsibility principle applied
+
+**项目结构原则 Gates:**
+- [ ] backend/golang and backend/python separation maintained
+- [ ] frontend directory properly structured
+- [ ] Each service has independent config, tests, deployment files
+
+**架构原则 Gates:**
+- [ ] High readability, scalability, maintainability demonstrated
+- [ ] Horizontal expansion capability designed
+- [ ] Service coupling minimized
+
+**开发规范原则 Gates:**
+- [ ] Chinese comments planned for code
+- [ ] English logging configured
+- [ ] Documentation plan aligned with requirements
 
 ## Project Structure
 
@@ -70,11 +105,19 @@ tests/
 
 # [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
 backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
+├── golang/              # Go services for microservices architecture
+│   ├── src/
+│   │   ├── models/
+│   │   ├── services/
+│   │   └── api/
+│   └── tests/
+├── python/              # Python services for microservices architecture
+│   ├── src/
+│   │   ├── models/
+│   │   ├── services/
+│   │   └── api/
+│   └── tests/
+└── tests/               # Integration tests across services
 
 frontend/
 ├── src/

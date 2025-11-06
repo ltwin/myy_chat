@@ -1,50 +1,70 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!-- Sync Impact Report:
+Version change: 0.0.0 → 1.0.0 (new constitution established)
+Modified principles: N/A (initial creation)
+Added sections:
+  - 代码质量原则
+  - API规范原则
+  - 部署原则
+  - 设计原则
+  - 项目结构原则
+  - 架构原则
+  - 开发规范原则
+Removed sections: N/A
+Templates requiring updates: ✅ plan-template.md, ✅ spec-template.md, ✅ tasks-template.md
+Follow-up TODOs: N/A
+-->
+
+# MyY Chat Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. 代码质量原则
+每个微服务必须有单元测试和集成测试，测试覆盖率至少达到70%。必须遵循防御式编程范式，在开发早期识别并处理潜在的安全风险、并发安全和幂等性问题。所有代码提交前必须通过静态代码分析。
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. API规范原则
+服务间通信优先使用gRPC + Protobuf（遵循Kratos框架默认规范）。对外提供的HTTP API必须严格遵循RESTful设计规范。所有API必须有完整的文档说明，包括请求/响应格式、错误码说明和使用示例。
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. 部署原则
+支持两种部署模式：Docker Compose模式用于开发环境和单机生产环境，Kubernetes模式用于云原生生产环境。配置必须支持在不同模式间灵活切换，CI/CD流水线必须同时支持两种部署方式的自动化构建和部署。
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. 设计原则
+严格遵循面向对象设计原则，包括里氏替换法则、依赖倒置原则等。可以适当使用二十三种设计模式，但禁止过度设计。每个组件都应该有明确的单一职责，接口设计要保持简洁和一致性。
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. 项目结构原则
+所有后端服务代码统一放置在backend目录中，其中golang代码和python代码必须分别放在独立的子目录中。前端代码统一放置在frontend目录中。每个服务目录都应该包含独立的配置文件、测试文件和部署文件。
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### VI. 架构原则
+系统设计必须具备优秀的可读性、可扩展性和可维护性。需要考虑业务扩张后的横向扩展能力和分布式部署需求，同时也要支持简单的单机部署场景。服务间耦合度必须保持在最低水平。
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+## 开发规范
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+### 编码语言规范
+- 使用中文编写代码注释，确保团队成员能够理解
+- 使用英文编写日志信息，便于国际化运维和问题排查
+- 在项目沟通中使用中文进行交流
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### 文档规范
+- 所有公共接口必须有完整的API文档
+- 关键业务逻辑必须有详细的设计文档
+- 部署和运维必须有完整的操作手册
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+本宪法在项目开发过程中具有最高约束力，所有其他规范和流程都必须遵循宪法原则。
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**版本控制策略**：
+- 主版本号：向后不兼容的重大修改
+- 次版本号：新增功能或重要改进
+- 修订号：Bug修复和文档更新
+
+**合规性要求**：
+- 所有代码审查必须验证是否符合宪法原则
+- 项目复杂性增加时必须提供充分的理由说明
+- 定期进行宪法合规性审查和更新
+
+**决策机制**：
+- 涉及架构原则的修改需要团队核心成员一致同意
+- 日常开发中的原则解释由架构师负责
+- 争议问题通过团队讨论解决
+
+**版本**: 1.0.0 | **制定**: 2025-11-06 | **最后修订**: 2025-11-06
