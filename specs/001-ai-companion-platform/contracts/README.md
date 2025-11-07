@@ -1,6 +1,6 @@
 # API Contracts
 
-本目录包含AI陪伴精灵平台的所有gRPC API定义(Protobuf格式)。
+本目录包含AI角色对话平台的所有gRPC API定义(Protobuf格式)。
 
 ## Overview
 

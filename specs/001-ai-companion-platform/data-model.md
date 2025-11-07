@@ -1,4 +1,4 @@
-# Data Model Design: AI陪伴精灵平台
+# Data Model Design: AI角色对话平台
 
 **Version**: 1.0
 **Date**: 2025-11-07

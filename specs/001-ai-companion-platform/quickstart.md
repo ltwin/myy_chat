@@ -1,4 +1,4 @@
-# Quick Start Guide: AI陪伴精灵平台
+# Quick Start Guide: AI角色对话平台
 
 **Version**: 1.0
 **Date**: 2025-11-07
