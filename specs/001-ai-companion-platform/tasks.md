@@ -1,8 +1,8 @@
 ---
-description: "Task list for AI陪伴精灵平台 MVP implementation"
+description: "Task list for AI角色对话平台 MVP implementation"
 ---
 
-# Tasks: AI陪伴精灵平台
+# Tasks: AI角色对话平台
 
 **Input**: Design documents from `/specs/001-ai-companion-platform/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
@@ -131,7 +131,7 @@ Each implementation phase MUST include:
 
 ---
 
-## Phase 3: User Story 1 - 用户与AI伴侣基础对话 (Priority: P1) 🎯 MVP (57 tasks)
+## Phase 3: User Story 1 - 用户与AI角色基础对话 (Priority: P1) 🎯 MVP (57 tasks)
 
 **Goal**: 用户可以注册账号、选择预设AI角色、发送消息并获得回复
 
@@ -208,7 +208,7 @@ Each implementation phase MUST include:
 
 ---
 
-## Phase 4: User Story 2 - AI伴侣记忆用户信息 (Priority: P1) 🎯 MVP (42 tasks)
+## Phase 4: User Story 2 - AI角色记忆用户信息 (Priority: P1) 🎯 MVP (42 tasks)
 
 **Goal**: AI能够记住用户告诉它的个人信息,在多次对话中表现出对用户的了解
 
@@ -296,7 +296,7 @@ Each implementation phase MUST include:
 - [ ] T166 [US3] Write unit tests for UpdateCharacter
 - [ ] T167 [US3] Create character creation wizard UI in frontend/app/characters/create/page.tsx
 
-### User Story 4 - AI伴侣使用工具能力 (P2)
+### User Story 4 - AI角色使用工具能力 (P2)
 
 - [ ] T168 [US4] Implement WeatherTool in backend/python/llm-service/app/services/tools/weather.py
 - [ ] T169 [US4] Write unit tests for WeatherTool

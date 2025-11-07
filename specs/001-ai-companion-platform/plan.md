@@ -1,4 +1,4 @@
-# Implementation Plan: AI陪伴精灵平台
+# Implementation Plan: AI角色对话平台
 
 **Branch**: `001-ai-companion-platform` | **Date**: 2025-11-07 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/001-ai-companion-platform/spec.md`
@@ -7,7 +7,7 @@
 
 ## Summary
 
-本项目旨在构建一个企业级的AI陪伴精灵平台,为每个用户打造独一无二的AI伴侣。核心特性包括:
+本项目旨在构建一个企业级的AI角色对话平台,为每个用户打造独一无二的AI角色。核心特性包括:
 
 - **用户认证与多设备同步**:支持邮箱/手机注册,准实时多设备同步(3-5秒轮询)
 - **AI角色管理**:预设+自定义角色,支持性格、背景、说话风格等全方位定制
