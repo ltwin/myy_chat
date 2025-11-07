@@ -1,0 +1,160 @@
+// User Service API Contract
+// 用户服务 - 负责用户认证、授权和画像管理
+syntax = "proto3";
+
+package myy_chat.user.v1;
+
+option go_package = "github.com/myy_chat/backend/golang/user-service/api/user/v1;v1";
+
+import "google/protobuf/timestamp.proto";
+
+// 用户服务定义
+service UserService {
+  // 用户注册
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
+  // 用户登录
+  rpc Login(LoginRequest) returns (LoginResponse);
+
+  // 刷新Token
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+
+  // 获取用户信息
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+
+  // 更新用户信息
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+
+  // 申请删除账号
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
+
+  // 恢复账号(冷静期内)
+  rpc RecoverAccount(RecoverAccountRequest) returns (RecoverAccountResponse);
+}
+
+// 注册请求
+message RegisterRequest {
+  string username = 1;  // 用户名(3-50字符)
+  string email = 2;     // 邮箱
+  string password = 3;  // 密码(最少8字符)
+  string phone = 4;     // 手机号(可选)
+  string verification_code = 5;  // 验证码
+}
+
+// 注册响应
+message RegisterResponse {
+  User user = 1;
+  string access_token = 2;  // JWT访问令牌
+  string refresh_token = 3; // 刷新令牌
+  int64 expires_in = 4;     // 过期时间(秒)
+}
+
+// 登录请求
+message LoginRequest {
+  string email = 1;     // 邮箱或用户名
+  string password = 2;  // 密码
+}
+
+// 登录响应
+message LoginResponse {
+  User user = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+  int64 expires_in = 4;
+}
+
+// 刷新Token请求
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+// 刷新Token响应
+message RefreshTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;
+}
+
+// 获取用户信息请求
+message GetUserRequest {
+  int64 user_id = 1;  // 用户ID(雪花ID)
+}
+
+// 获取用户信息响应
+message GetUserResponse {
+  User user = 1;
+  UserProfile profile = 2;
+}
+
+// 更新用户信息请求
+message UpdateUserRequest {
+  int64 user_id = 1;
+  string username = 2;  // 可选
+  string avatar_url = 3;  // 可选
+  UserProfile profile = 4;  // 可选
+}
+
+// 更新用户信息响应
+message UpdateUserResponse {
+  User user = 1;
+  UserProfile profile = 2;
+}
+
+// 删除账号请求
+message DeleteAccountRequest {
+  int64 user_id = 1;
+  string password = 2;  // 确认密码
+  string reason = 3;    // 删除原因(可选)
+}
+
+// 删除账号响应
+message DeleteAccountResponse {
+  bool success = 1;
+  google.protobuf.Timestamp deletion_scheduled_at = 2;  // 计划删除时间(30天后)
+  string message = 3;  // 提示信息
+}
+
+// 恢复账号请求
+message RecoverAccountRequest {
+  int64 user_id = 1;
+  string verification_code = 2;  // 邮箱验证码
+}
+
+// 恢复账号响应
+message RecoverAccountResponse {
+  bool success = 1;
+  User user = 2;
+  string message = 3;
+}
+
+// 用户实体
+message User {
+  int64 id = 1;  // 雪花ID
+  string username = 2;
+  string email = 3;
+  string phone = 4;
+  string avatar_url = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp last_login_at = 7;
+  bool is_deleted = 8;
+  google.protobuf.Timestamp deletion_scheduled_at = 9;
+}
+
+// 用户画像
+message UserProfile {
+  int64 user_id = 1;
+  string full_name = 2;
+  string gender = 3;  // male, female, other
+  string birth_date = 4;  // ISO 8601格式
+  Location location = 5;
+  repeated string interests = 6;
+  string occupation = 7;
+  string bio = 8;
+}
+
+// 位置信息
+message Location {
+  string country = 1;
+  string city = 2;
+  string timezone = 3;
+}

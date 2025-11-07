@@ -1,0 +1,147 @@
+// Conversation Service API Contract
+// 对话服务 - 负责会话管理和消息路由
+syntax = "proto3";
+
+package myy_chat.conversation.v1;
+
+option go_package = "github.com/myy_chat/backend/golang/conversation-service/api/conversation/v1;v1";
+
+import "google/protobuf/timestamp.proto";
+
+// 对话服务定义
+service ConversationService {
+  // 创建会话
+  rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
+
+  // 获取会话列表
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+
+  // 获取会话详情
+  rpc GetConversation(GetConversationRequest) returns (GetConversationResponse);
+
+  // 发送消息(同步)
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+
+  // 发送消息(流式)
+  rpc StreamMessage(SendMessageRequest) returns (stream MessageChunk);
+
+  // 获取消息历史
+  rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
+
+  // 归档会话
+  rpc ArchiveConversation(ArchiveConversationRequest) returns (ArchiveConversationResponse);
+}
+
+// 创建会话请求
+message CreateConversationRequest {
+  int64 user_id = 1;
+  int64 character_id = 2;
+  string title = 3;  // 可选
+}
+
+// 创建会话响应
+message CreateConversationResponse {
+  Conversation conversation = 1;
+}
+
+// 获取会话列表请求
+message ListConversationsRequest {
+  int64 user_id = 1;
+  int32 page = 2;       // 页码(从1开始)
+  int32 page_size = 3;  // 每页数量(默认20)
+  bool include_archived = 4;  // 是否包含归档会话
+}
+
+// 获取会话列表响应
+message ListConversationsResponse {
+  repeated Conversation conversations = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// 获取会话详情请求
+message GetConversationRequest {
+  int64 conversation_id = 1;
+}
+
+// 获取会话详情响应
+message GetConversationResponse {
+  Conversation conversation = 1;
+}
+
+// 发送消息请求
+message SendMessageRequest {
+  int64 conversation_id = 1;
+  int64 user_id = 2;
+  string content = 3;
+  string idempotency_key = 4;  // 幂等性Key(保持为string)
+}
+
+// 发送消息响应
+message SendMessageResponse {
+  Message user_message = 1;      // 用户消息
+  Message assistant_message = 2; // AI回复
+  int32 tokens_used = 3;         // 消耗的token数
+  float credits_deducted = 4;    // 扣除的积分
+  float credits_remaining = 5;   // 剩余积分
+}
+
+// 消息流式响应
+message MessageChunk {
+  int64 conversation_id = 1;
+  int64 message_id = 2;
+  string delta = 3;  // 增量内容
+  bool is_final = 4;  // 是否为最后一块
+}
+
+// 获取消息历史请求
+message GetMessagesRequest {
+  int64 conversation_id = 1;
+  int32 limit = 2;  // 最近N条消息(默认50)
+  int64 before_message_id = 3;  // 分页游标(可选)
+}
+
+// 获取消息历史响应
+message GetMessagesResponse {
+  repeated Message messages = 1;
+  bool has_more = 2;
+  string next_cursor = 3;
+}
+
+// 归档会话请求
+message ArchiveConversationRequest {
+  int64 conversation_id = 1;
+  bool is_archived = 2;  // true=归档, false=取消归档
+}
+
+// 归档会话响应
+message ArchiveConversationResponse {
+  bool success = 1;
+}
+
+// 会话实体
+message Conversation {
+  int64 id = 1;  // 雪花ID
+  int64 user_id = 2;
+  int64 character_id = 3;
+  string character_name = 4;
+  string character_avatar = 5;
+  string title = 6;
+  int32 message_count = 7;
+  int32 token_count = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp last_message_at = 10;
+  bool is_archived = 11;
+}
+
+// 消息实体
+message Message {
+  int64 id = 1;  // 雪花ID
+  int64 conversation_id = 2;
+  string role = 3;  // user, assistant, system
+  string content = 4;
+  int32 token_count = 5;
+  map<string, string> metadata = 6;  // {"latency_ms": "2500", "model": "gpt-4"}
+  google.protobuf.Timestamp created_at = 7;
+}

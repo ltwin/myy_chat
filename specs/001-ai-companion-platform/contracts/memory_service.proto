@@ -1,0 +1,163 @@
+// Memory Service API Contract
+// 记忆服务 - 负责记忆存储、检索和管理
+syntax = "proto3";
+
+package myy_chat.memory.v1;
+
+option go_package = "github.com/myy_chat/backend/golang/memory-service/api/memory/v1;v1";
+
+import "google/protobuf/timestamp.proto";
+
+// 记忆服务定义
+service MemoryService {
+  // 保存记忆
+  rpc SaveMemory(SaveMemoryRequest) returns (SaveMemoryResponse);
+
+  // 检索记忆(向量相似度)
+  rpc RetrieveMemories(RetrieveMemoriesRequest) returns (RetrieveMemoriesResponse);
+
+  // 获取用户画像
+  rpc GetUserPortrait(GetUserPortraitRequest) returns (GetUserPortraitResponse);
+
+  // 更新关系
+  rpc UpdateRelationship(UpdateRelationshipRequest) returns (UpdateRelationshipResponse);
+
+  // 获取关系状态
+  rpc GetRelationship(GetRelationshipRequest) returns (GetRelationshipResponse);
+
+  // 删除记忆
+  rpc DeleteMemory(DeleteMemoryRequest) returns (DeleteMemoryResponse);
+}
+
+// 保存记忆请求
+message SaveMemoryRequest {
+  int64 user_id = 1;
+  int64 character_id = 2;
+  string content = 3;
+  MemoryType type = 4;
+  int32 importance = 5;  // 1-10
+  map<string, string> structured_data = 6;
+  repeated float embedding = 7;  // 1536维向量
+}
+
+// 保存记忆响应
+message SaveMemoryResponse {
+  Memory memory = 1;
+}
+
+// 检索记忆请求
+message RetrieveMemoriesRequest {
+  int64 user_id = 1;
+  int64 character_id = 2;
+  string query = 3;  // 查询文本
+  repeated float query_embedding = 4;  // 查询向量
+  int32 limit = 5;  // 返回数量(默认5)
+  float min_similarity = 6;  // 最小相似度(默认0.7)
+  repeated MemoryType types = 7;  // 过滤记忆类型(可选)
+}
+
+// 检索记忆响应
+message RetrieveMemoriesResponse {
+  repeated MemoryWithScore memories = 1;
+}
+
+// 获取用户画像请求
+message GetUserPortraitRequest {
+  int64 user_id = 1;
+  int64 character_id = 2;
+}
+
+// 获取用户画像响应
+message GetUserPortraitResponse {
+  UserPortrait portrait = 1;
+}
+
+// 更新关系请求
+message UpdateRelationshipRequest {
+  int64 user_id = 1;
+  int64 character_id = 2;
+  float closeness_delta = 3;  // 亲密度变化(-10 to +10)
+  map<string, int32> emotional_bond_updates = 4;  // {"trust": 5, "affection": -3}
+}
+
+// 更新关系响应
+message UpdateRelationshipResponse {
+  Relationship relationship = 1;
+}
+
+// 获取关系请求
+message GetRelationshipRequest {
+  int64 user_id = 1;
+  int64 character_id = 2;
+}
+
+// 获取关系响应
+message GetRelationshipResponse {
+  Relationship relationship = 1;
+}
+
+// 删除记忆请求
+message DeleteMemoryRequest {
+  int64 memory_id = 1;
+}
+
+// 删除记忆响应
+message DeleteMemoryResponse {
+  bool success = 1;
+}
+
+// 记忆类型枚举
+enum MemoryType {
+  MEMORY_TYPE_UNSPECIFIED = 0;
+  USER_PROFILE = 1;   // 用户画像
+  EVENT = 2;          // 事件记忆
+  EMOTION = 3;        // 情感状态
+  CORE = 4;           // 核心记忆
+  TRIVIA = 5;         // 琐碎信息
+}
+
+// 记忆实体
+message Memory {
+  int64 id = 1;  // 雪花ID
+  int64 user_id = 2;
+  int64 character_id = 3;
+  MemoryType type = 4;
+  string content = 5;
+  int32 importance = 6;
+  map<string, string> structured_data = 7;
+  int32 access_count = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp last_accessed_at = 10;
+}
+
+// 带相似度分数的记忆
+message MemoryWithScore {
+  Memory memory = 1;
+  float similarity = 2;  // 向量相似度(0-1)
+  float final_score = 3;  // 综合评分(考虑时间衰减和重要性)
+}
+
+// 用户画像
+message UserPortrait {
+  int64 user_id = 1;
+  int64 character_id = 2;
+  string full_name = 3;
+  int32 age = 4;
+  string gender = 5;
+  repeated string interests = 6;
+  string occupation = 7;
+  string personality = 8;  // AI总结的用户性格
+  repeated string important_facts = 9;  // 重要事实
+}
+
+// 关系实体
+message Relationship {
+  int64 user_id = 1;
+  int64 character_id = 2;
+  string relation_type = 3;  // friend, lover, mentor
+  float closeness = 4;  // 0-100
+  map<string, int32> emotional_bond = 5;  // {"trust": 80, "affection": 70}
+  int32 interaction_count = 6;
+  int32 total_conversation_time = 7;  // 秒
+  google.protobuf.Timestamp last_interaction_at = 8;
+}
