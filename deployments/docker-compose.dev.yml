@@ -1,0 +1,177 @@
+# Docker Compose 开发环境配置 - MyY Chat AI角色对话平台
+# 启动命令: docker-compose -f docker-compose.dev.yml up -d
+
+version: '3.9'
+
+networks:
+  myy-chat-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+services:
+  # ============================================
+  # 基础设施服务
+  # ============================================
+
+  # PostgreSQL 16 with pgvector
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: myy-chat-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-myy_chat}
+      POSTGRES_USER: ${POSTGRES_USER:-myy_chat_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-myy_chat_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 7
+  redis:
+    image: redis:7-alpine
+    container_name: myy-chat-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # MinIO (对象存储)
+  minio:
+    image: minio/minio:latest
+    container_name: myy-chat-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ============================================
+  # Golang 微服务 (占位符,待后续实现)
+  # ============================================
+
+  # user-service:
+  #   build:
+  #     context: ../backend/golang/user-service
+  #     dockerfile: Dockerfile
+  #   container_name: myy-chat-user-service
+  #   restart: unless-stopped
+  #   environment:
+  #     - DATABASE_URL=postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}
+  #     - REDIS_HOST=redis
+  #     - DATACENTER_ID=${DATACENTER_ID:-1}
+  #     - WORKER_ID=${WORKER_ID:-1}
+  #   ports:
+  #     - "50051:50051"
+  #     - "8051:8051"
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #   networks:
+  #     - myy-chat-network
+
+  # ============================================
+  # Python 微服务 (占位符,待后续实现)
+  # ============================================
+
+  # llm-service:
+  #   build:
+  #     context: ../backend/python/llm-service
+  #     dockerfile: Dockerfile
+  #   container_name: myy-chat-llm-service
+  #   restart: unless-stopped
+  #   environment:
+  #     - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+  #     - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+  #   ports:
+  #     - "50061:50061"
+  #     - "8061:8061"
+  #   networks:
+  #     - myy-chat-network
+
+  # ============================================
+  # Frontend (占位符,待后续实现)
+  # ============================================
+
+  # frontend:
+  #   build:
+  #     context: ../frontend
+  #     dockerfile: Dockerfile
+  #   container_name: myy-chat-frontend
+  #   restart: unless-stopped
+  #   environment:
+  #     - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+  #   ports:
+  #     - "3000:3000"
+  #   networks:
+  #     - myy-chat-network
+
+  # ============================================
+  # 可观测性 (可选,用于生产环境)
+  # ============================================
+
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: myy-chat-prometheus
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   ports:
+  #     - "9090:9090"
+  #   networks:
+  #     - myy-chat-network
+
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   container_name: myy-chat-grafana
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3001:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #   networks:
+  #     - myy-chat-network
+
+  # jaeger:
+  #   image: jaegertracing/all-in-one:latest
+  #   container_name: myy-chat-jaeger
+  #   restart: unless-stopped
+  #   ports:
+  #     - "16686:16686"  # Jaeger UI
+  #     - "14268:14268"  # Collector HTTP
+  #   networks:
+  #     - myy-chat-network

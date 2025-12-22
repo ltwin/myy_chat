@@ -3,7 +3,7 @@
 **Version**: 1.0
 **Date**: 2025-11-07
 **Status**: Design Approved
-**Database**: PostgreSQL 15 + pgvector extension
+**Database**: PostgreSQL 16 + pgvector extension
 
 ---
 
@@ -22,7 +22,7 @@
 
 ### Database Architecture
 
-- **Primary Database**: PostgreSQL 15
+- **Primary Database**: PostgreSQL 16
 - **Extensions**: pgvector (向量存储)
 - **Connection Pool**: pgBouncer (最大连接数200)
 - **Replication**: 主从复制(1主2从,读写分离)

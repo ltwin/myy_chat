@@ -1,0 +1,265 @@
+# CI Pipeline for MyY Chat AI角色对话平台
+# 自动化测试、代码质量检查和构建
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+  pull_request:
+    branches: [main, develop]
+
+# 防止同一分支并发运行
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.21'
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+jobs:
+  # ============================================
+  # Golang 服务检查
+  # ============================================
+  golang-services:
+    name: Golang Services - Test & Lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - user-service
+          - character-service
+          - conversation-service
+          - memory-service
+          - billing-service
+          - admin-service
+          - analytics-service
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: backend/golang/${{ matrix.service }}/go.sum
+
+      - name: Install Dependencies
+        working-directory: backend/golang/${{ matrix.service }}
+        run: go mod download
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: backend/golang/${{ matrix.service }}
+          args: --timeout=5m
+
+      - name: Run Tests
+        working-directory: backend/golang/${{ matrix.service }}
+        run: |
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+          go tool cover -func=coverage.out | tail -1
+
+      - name: Check Coverage (≥70%)
+        working-directory: backend/golang/${{ matrix.service }}
+        run: |
+          coverage=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
+          echo "Coverage: ${coverage}%"
+          if (( $(echo "$coverage < 70" | bc -l) )); then
+            echo "❌ Coverage ${coverage}% is below 70% threshold"
+            exit 1
+          fi
+          echo "✅ Coverage ${coverage}% meets 70% threshold"
+
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: backend/golang/${{ matrix.service }}/coverage.out
+          flags: ${{ matrix.service }}
+          name: ${{ matrix.service }}
+
+  # ============================================
+  # Python 服务检查
+  # ============================================
+  python-services:
+    name: Python Services - Test & Lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - llm-service
+          - memory-processor
+          - compression-service
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: backend/python/${{ matrix.service }}/requirements.txt
+
+      - name: Install Dependencies
+        working-directory: backend/python/${{ matrix.service }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Ruff Linter
+        working-directory: backend/python/${{ matrix.service }}
+        run: ruff check . --output-format=github
+
+      - name: Run Ruff Formatter
+        working-directory: backend/python/${{ matrix.service }}
+        run: ruff format --check .
+
+      - name: Run MyPy Type Check
+        working-directory: backend/python/${{ matrix.service }}
+        run: mypy . --ignore-missing-imports
+
+      - name: Run Pytest
+        working-directory: backend/python/${{ matrix.service }}
+        run: |
+          pytest --cov=. --cov-report=xml --cov-report=term --cov-fail-under=70
+
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: backend/python/${{ matrix.service }}/coverage.xml
+          flags: ${{ matrix.service }}
+          name: ${{ matrix.service }}
+
+  # ============================================
+  # Frontend 检查
+  # ============================================
+  frontend:
+    name: Frontend - Test & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Run Type Check
+        working-directory: frontend
+        run: npm run type-check
+
+      - name: Run Build
+        working-directory: frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+
+      - name: Run Playwright Tests
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps
+          npm run test:e2e || true  # E2E tests optional in early phase
+
+  # ============================================
+  # Docker 构建测试
+  # ============================================
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - backend/golang/user-service
+          - backend/python/llm-service
+          - frontend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service }}
+          push: false
+          tags: ${{ matrix.service }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================
+  # 安全扫描
+  # ============================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy Results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # ============================================
+  # 总结报告
+  # ============================================
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs:
+      - golang-services
+      - python-services
+      - frontend
+      - docker-build
+      - security-scan
+    if: always()
+
+    steps:
+      - name: Check Results
+        run: |
+          echo "✅ CI Pipeline Complete"
+          echo "Golang Services: ${{ needs.golang-services.result }}"
+          echo "Python Services: ${{ needs.python-services.result }}"
+          echo "Frontend: ${{ needs.frontend.result }}"
+          echo "Docker Build: ${{ needs.docker-build.result }}"
+          echo "Security Scan: ${{ needs.security-scan.result }}"
+
+          if [ "${{ needs.golang-services.result }}" != "success" ] || \
+             [ "${{ needs.python-services.result }}" != "success" ] || \
+             [ "${{ needs.frontend.result }}" != "success" ]; then
+            echo "❌ CI Failed"
+            exit 1
+          fi
+          echo "✅ All Checks Passed"

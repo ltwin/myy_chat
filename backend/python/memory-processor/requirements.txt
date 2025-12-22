@@ -1,0 +1,31 @@
+# Memory Processor Dependencies
+fastapi==0.121.0
+uvicorn[standard]==0.37.0
+grpcio==1.70.0
+grpcio-tools==1.70.0
+protobuf==4.25.3
+pydantic==2.10.6
+pydantic-settings==2.7.0
+
+# Embedding & NLP
+transformers==4.48.3
+torch==2.5.1
+sentence-transformers==3.3.1
+httpx==0.28.1
+
+# Database
+psycopg[binary]==3.2.3
+redis==5.2.1
+
+# Utilities
+python-dotenv==1.0.1
+structlog==24.4.0
+numpy==2.2.1
+
+# Development
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+ruff==0.9.2
+black==24.10.0
+mypy==1.14.1

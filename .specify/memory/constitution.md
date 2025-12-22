@@ -1,16 +1,13 @@
 <!-- Sync Impact Report:
-Version change: 0.0.0 → 1.0.0 (new constitution established)
-Modified principles: N/A (initial creation)
+Version change: 1.1.0 → 1.2.0 (MINOR - new development standard added)
+Modified principles: N/A (existing principles unchanged)
 Added sections:
-  - 代码质量原则
-  - API规范原则
-  - 部署原则
-  - 设计原则
-  - 项目结构原则
-  - 架构原则
-  - 开发规范原则
+  - 代码检视与提交规范 under 开发规范
 Removed sections: N/A
-Templates requiring updates: ✅ plan-template.md, ✅ spec-template.md, ✅ tasks-template.md
+Templates requiring updates:
+  - ✅ plan-template.md - Constitution Check section needs review checkpoint gate
+  - ✅ spec-template.md - Quality Requirements section already references constitution
+  - ✅ tasks-template.md - Quality Tasks section already references constitution
 Follow-up TODOs: N/A
 -->
 
@@ -48,6 +45,89 @@ Follow-up TODOs: N/A
 - 关键业务逻辑必须有详细的设计文档
 - 部署和运维必须有完整的操作手册
 
+### Git分支管理规范
+项目必须遵循GitFlow工作流规范进行版本控制和分支管理。
+
+**主要分支**:
+- `main`: 生产环境分支，存放稳定可发布的代码，仅接受来自release或hotfix分支的合并
+- `develop`: 开发主分支，包含最新的开发功能，是feature分支的基础
+
+**支持分支**:
+- `feature/*`: 功能开发分支，从develop分支创建，完成后合并回develop
+  - 命名规范: `feature/功能描述` 或 `feature/issue-编号-功能描述`
+- `release/*`: 发布准备分支，从develop创建，完成后同时合并到main和develop
+  - 命名规范: `release/vX.Y.Z`
+- `hotfix/*`: 紧急修复分支，从main创建，完成后同时合并到main和develop
+  - 命名规范: `hotfix/vX.Y.Z` 或 `hotfix/问题描述`
+
+**合并规则**:
+- feature → develop: 使用Pull Request进行代码审查后合并
+- release → main, develop: 发布完成后标记版本Tag
+- hotfix → main, develop: 紧急修复后立即合并并标记版本Tag
+
+**提交规范**:
+- 提交信息必须清晰描述改动内容
+- 建议使用Conventional Commits规范（feat:, fix:, docs:, refactor:, test:等）
+
+### 技术文档查阅规范
+在使用第三方库、框架或语言特性时，必须通过Context7 MCP工具查阅最新文档。
+
+**强制要求**:
+- 引入新的第三方库之前，必须先通过`context7.resolve-library-id`获取库ID
+- 使用`context7.get-library-docs`获取最新的官方文档
+- 使用不熟悉的语言特性或API时，必须先查阅对应文档
+
+**适用场景**:
+- 选择或评估第三方库时
+- 配置框架（如Kratos、FastAPI等）时
+- 使用数据库驱动或ORM时
+- 集成外部服务或SDK时
+- 使用语言高级特性时
+
+**操作流程**:
+1. 确定需要查阅的库或技术名称
+2. 调用`resolve-library-id`获取Context7兼容的库ID
+3. 调用`get-library-docs`获取相关主题的文档
+4. 基于官方文档进行开发决策和实现
+
+**目的**: 确保代码实现符合最新最佳实践，避免使用已废弃的API或错误的用法。
+
+### 代码检视与提交规范
+在完成一个相对完整的功能迭代或修复一个完整的Bug后，必须暂停开发流程，进行代码检视并生成规范的提交信息。
+
+**强制暂停点**:
+- 完成一个小迭代（小功能点的完整实现）
+- 完成一个相对完整的功能模块
+- 完成一个Bug的完整修复
+- 完成一组相关的代码重构
+
+**暂停时必须执行的操作**:
+1. 停止继续开发，等待用户进行代码检视
+2. 提供本次修改的简要说明
+3. 列出本次修改涉及的文件清单
+4. 生成符合Conventional Commits规范的git commit信息
+
+**Commit信息格式**:
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**type类型**:
+- `feat`: 新功能
+- `fix`: Bug修复
+- `docs`: 文档变更
+- `style`: 代码格式（不影响代码运行的变动）
+- `refactor`: 重构（既不是新增功能，也不是修复Bug）
+- `perf`: 性能优化
+- `test`: 增加测试
+- `chore`: 构建过程或辅助工具的变动
+
+**目的**: 确保代码质量通过人工检视，保持提交历史清晰可追溯，便于后续代码审查和问题定位。
+
 ## Governance
 
 本宪法在项目开发过程中具有最高约束力，所有其他规范和流程都必须遵循宪法原则。
@@ -67,4 +147,4 @@ Follow-up TODOs: N/A
 - 日常开发中的原则解释由架构师负责
 - 争议问题通过团队讨论解决
 
-**版本**: 1.0.0 | **制定**: 2025-11-06 | **最后修订**: 2025-11-06
+**版本**: 1.2.0 | **制定**: 2025-11-06 | **最后修订**: 2025-12-21

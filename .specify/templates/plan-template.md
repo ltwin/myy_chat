@@ -67,6 +67,10 @@
 - [ ] Chinese comments planned for code
 - [ ] English logging configured
 - [ ] Documentation plan aligned with requirements
+- [ ] GitFlow branching strategy adopted (main, develop, feature/*, release/*, hotfix/*)
+- [ ] Context7 MCP tool used for third-party library documentation lookup
+- [ ] Code review checkpoints planned after each complete iteration/feature/bugfix
+- [ ] Conventional Commits format adopted for commit messages
 
 ## Project Structure
 

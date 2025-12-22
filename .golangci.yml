@@ -1,0 +1,137 @@
+# golangci-lint configuration for MyY Chat project
+# Ensures code quality ≥70% coverage per constitution
+# Configuration version: v2 (golangci-lint 1.50+)
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+  allow-parallel-runners: true
+  go: '1.25.3'
+
+output:
+  formats:
+    text:
+      path: stdout
+      colors: true
+      print-linter-name: true
+      print-issued-lines: true
+  show-stats: true
+
+linters:
+  default: none
+  enable:
+    - errcheck      # 检查未处理的错误
+    - gosimple      # 简化代码建议
+    - govet         # Go vet 静态分析
+    - ineffassign   # 检测无效赋值
+    - staticcheck   # 高级静态分析
+    - unused        # 检测未使用的常量、变量、函数
+    - misspell      # 拼写检查
+    - gocritic      # Go 代码审查
+    - gosec         # 安全检查
+    - revive        # 代码风格检查
+    - typecheck     # 类型检查
+    - bodyclose     # HTTP response body 关闭检查
+    - nilerr        # nil 错误检查
+    - nolintlint    # nolint 指令检查
+    - predeclared   # 预声明标识符检查
+    - sqlclosecheck # SQL rows.Close() 检查
+    - wastedassign  # 浪费赋值检查
+
+  disable:
+    - exhaustive    # 过于严格
+    - exhaustruct   # 过于严格
+    - funlen        # 函数长度限制过于严格
+    - gochecknoglobals # 允许必要的全局变量
+    - gochecknoinits   # 允许 init 函数
+    - gocognit         # 认知复杂度过于严格
+    - gocyclo          # 圈复杂度过于严格
+    - godot            # 注释句号检查过于严格
+    - mnd              # 魔法数字检查过于严格 (formerly gomnd)
+    - wrapcheck        # 错误包装检查过于严格
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    govet:
+      enable-all: true
+      disable:
+        - shadow  # 允许变量遮蔽
+
+    revive:
+      rules:
+        - name: exported
+          severity: warning
+          disabled: false
+        - name: package-comments
+          severity: warning
+          disabled: false
+        - name: var-naming
+          severity: warning
+          arguments:
+            - ["ID", "URL", "HTTP", "JSON", "API", "UUID", "SQL", "LLM", "AI", "QPS", "JWT", "gRPC", "RPC"]
+
+    gosec:
+      severity: medium
+      excludes:
+        - G104  # 允许某些未检查的错误
+        - G204  # 允许动态命令执行(在受控环境中)
+
+    misspell:
+      locale: US
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - commentedOutCode
+        - whyNoLint
+
+  exclusions:
+    rules:
+      # 排除测试文件的某些检查
+      - path: '_test\.go'
+        linters:
+          - errcheck
+          - gosec
+          - dupl
+
+      # 排除生成代码
+      - path: '\.pb\.go$'
+        linters:
+          - errcheck
+          - gosec
+          - govet
+          - staticcheck
+          - unused
+
+      # 排除 Wire 生成的代码
+      - path: 'wire_gen\.go$'
+        linters:
+          - errcheck
+          - gosec
+          - govet
+          - staticcheck
+          - unused
+
+formatters:
+  enable:
+    - gofmt         # 代码格式化
+    - goimports     # 导入排序
+
+  settings:
+    gofmt:
+      simplify: true
+
+issues:
+  uniq-by-line: true
+  max-issues-per-linter: 50
+  max-same-issues: 3
+  new-from-rev: HEAD

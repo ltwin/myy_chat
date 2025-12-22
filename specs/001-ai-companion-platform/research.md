@@ -32,7 +32,7 @@
 |-------|---------------|-------------|---------------|
 | **Backend (Go)** | Kratos v2.7+ | Go-kit, Gin | 原生gRPC+Protobuf支持,DDD友好 |
 | **Backend (Python)** | FastAPI + LangChain | Django, Flask | 高性能异步,LLM生态成熟 |
-| **Database** | PostgreSQL 15 + pgvector | MySQL + Milvus | 事务一致性+向量扩展一体化 |
+| **Database** | PostgreSQL 16 + pgvector | MySQL + Milvus | 事务一致性+向量扩展一体化 |
 | **Cache** | Redis 7 | Memcached | 丰富数据结构,分布式锁支持 |
 | **MQ** | Kafka / Redis Streams | RabbitMQ | 高吞吐,事件溯源 |
 | **Embedding** | BGE-M3 | OpenAI ada-002 | 中文优秀,本地部署,免费 |
@@ -198,9 +198,9 @@ agent = workflow.compile()
 
 ## 3. Database Architecture
 
-### 3.1 Primary Database: PostgreSQL 15 + pgvector
+### 3.1 Primary Database: PostgreSQL 16 + pgvector
 
-**Decision**: PostgreSQL 15作为主数据库,集成pgvector扩展进行向量存储
+**Decision**: PostgreSQL 16作为主数据库,集成pgvector扩展进行向量存储
 
 **Rationale**:
 
@@ -1076,7 +1076,7 @@ frontend/src/
    version: '3.8'
    services:
      postgres:
-       image: pgvector/pgvector:pg15
+       image: pgvector/pgvector:pg16
      redis:
        image: redis:7-alpine
      user-service:
