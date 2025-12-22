@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+package analytics.v1;
+
+option go_package = "github.com/myy-chat/backend/golang/api/analytics/v1;v1";
+option java_multiple_files = true;
+option java_package = "analytics.v1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+// AnalyticsService 数据分析服务
+service AnalyticsService {
+  // TrackEvent 追踪事件
+  rpc TrackEvent(TrackEventRequest) returns (TrackEventResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/analytics/events"
+      body: "*"
+    };
+  }
+
+  // GetUserAnalytics 获取用户分析数据
+  rpc GetUserAnalytics(GetUserAnalyticsRequest) returns (GetUserAnalyticsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/analytics/users/{user_id}"
+    };
+  }
+
+  // GetCharacterAnalytics 获取角色分析数据
+  rpc GetCharacterAnalytics(GetCharacterAnalyticsRequest) returns (GetCharacterAnalyticsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/analytics/characters/{character_id}"
+    };
+  }
+
+  // GetConversationAnalytics 获取对话分析数据
+  rpc GetConversationAnalytics(GetConversationAnalyticsRequest) returns (GetConversationAnalyticsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/analytics/conversations/{conversation_id}"
+    };
+  }
+
+  // GetPlatformMetrics 获取平台指标
+  rpc GetPlatformMetrics(GetPlatformMetricsRequest) returns (GetPlatformMetricsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/analytics/platform"
+    };
+  }
+}
+
+// TrackEventRequest 追踪事件请求
+message TrackEventRequest {
+  int64 user_id = 1;                // 用户ID
+  string event_type = 2;            // 事件类型
+  string event_name = 3;            // 事件名称
+  map<string, string> properties = 4;  // 事件属性
+  google.protobuf.Timestamp timestamp = 5;  // 事件时间
+}
+
+// TrackEventResponse 追踪事件响应
+message TrackEventResponse {
+  bool success = 1;      // 是否成功
+  string event_id = 2;   // 事件ID
+}
+
+// GetUserAnalyticsRequest 获取用户分析请求
+message GetUserAnalyticsRequest {
+  int64 user_id = 1;     // 用户ID
+  string period = 2;     // 统计周期: "day", "week", "month"
+}
+
+// GetUserAnalyticsResponse 获取用户分析响应
+message GetUserAnalyticsResponse {
+  int64 user_id = 1;                     // 用户ID
+  int64 total_conversations = 2;         // 总对话数
+  int64 total_messages = 3;              // 总消息数
+  int64 total_tokens = 4;                // 总Token消耗
+  int64 average_session_duration = 5;    // 平均会话时长(秒)
+  repeated CharacterUsage top_characters = 6;  // 最常使用的角色
+  repeated HourlyActivity hourly_activity = 7; // 每小时活跃度
+}
+
+// GetCharacterAnalyticsRequest 获取角色分析请求
+message GetCharacterAnalyticsRequest {
+  int64 character_id = 1;  // 角色ID
+  string period = 2;       // 统计周期
+}
+
+// GetCharacterAnalyticsResponse 获取角色分析响应
+message GetCharacterAnalyticsResponse {
+  int64 character_id = 1;           // 角色ID
+  int64 total_users = 2;            // 使用用户数
+  int64 total_conversations = 3;    // 总对话数
+  int64 total_messages = 4;         // 总消息数
+  float average_rating = 5;         // 平均评分
+  float retention_rate = 6;         // 留存率
+  repeated DailyUsage daily_usage = 7;  // 每日使用量
+}
+
+// GetConversationAnalyticsRequest 获取对话分析请求
+message GetConversationAnalyticsRequest {
+  int64 conversation_id = 1;  // 对话ID
+}
+
+// GetConversationAnalyticsResponse 获取对话分析响应
+message GetConversationAnalyticsResponse {
+  int64 conversation_id = 1;         // 对话ID
+  int64 message_count = 2;           // 消息数
+  int64 total_tokens = 3;            // 总Token
+  int64 duration_seconds = 4;        // 持续时长(秒)
+  float sentiment_score = 5;         // 情感得分(-1到1)
+  repeated string topics = 6;        // 讨论话题
+}
+
+// GetPlatformMetricsRequest 获取平台指标请求
+message GetPlatformMetricsRequest {
+  string period = 1;                 // 统计周期
+  google.protobuf.Timestamp start_time = 2;  // 开始时间
+  google.protobuf.Timestamp end_time = 3;    // 结束时间
+}
+
+// GetPlatformMetricsResponse 获取平台指标响应
+message GetPlatformMetricsResponse {
+  int64 dau = 1;                     // 日活用户
+  int64 mau = 2;                     // 月活用户
+  int64 new_users = 3;               // 新增用户
+  int64 total_messages = 4;          // 消息总数
+  int64 total_tokens = 5;            // Token总消耗
+  float average_session_length = 6;  // 平均会话时长
+  float user_retention_d1 = 7;       // 次日留存率
+  float user_retention_d7 = 8;       // 7日留存率
+  repeated TimeSeriesPoint time_series = 9;  // 时间序列数据
+}
+
+// CharacterUsage 角色使用情况
+message CharacterUsage {
+  int64 character_id = 1;     // 角色ID
+  string character_name = 2;  // 角色名称
+  int64 message_count = 3;    // 消息数
+  int64 conversation_count = 4;  // 对话数
+}
+
+// HourlyActivity 每小时活跃度
+message HourlyActivity {
+  int32 hour = 1;           // 小时(0-23)
+  int64 message_count = 2;  // 消息数
+  int64 active_users = 3;   // 活跃用户数
+}
+
+// DailyUsage 每日使用量
+message DailyUsage {
+  string date = 1;          // 日期
+  int64 users = 2;          // 用户数
+  int64 messages = 3;       // 消息数
+  int64 conversations = 4;  // 对话数
+}
+
+// TimeSeriesPoint 时间序列点
+message TimeSeriesPoint {
+  google.protobuf.Timestamp timestamp = 1;  // 时间点
+  int64 value = 2;                          // 值
+  string metric = 3;                        // 指标名称
+}

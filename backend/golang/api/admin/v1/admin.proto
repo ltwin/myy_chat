@@ -1,0 +1,210 @@
+syntax = "proto3";
+
+package admin.v1;
+
+option go_package = "github.com/myy-chat/backend/golang/api/admin/v1;v1";
+option java_multiple_files = true;
+option java_package = "admin.v1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+// AdminService 管理后台服务
+service AdminService {
+  // ListUsers 获取用户列表
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/admin/users"
+    };
+  }
+
+  // GetUserDetail 获取用户详情
+  rpc GetUserDetail(GetUserDetailRequest) returns (GetUserDetailResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/admin/users/{user_id}"
+    };
+  }
+
+  // BanUser 封禁用户
+  rpc BanUser(BanUserRequest) returns (BanUserResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/admin/users/{user_id}/ban"
+      body: "*"
+    };
+  }
+
+  // UnbanUser 解封用户
+  rpc UnbanUser(UnbanUserRequest) returns (UnbanUserResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/admin/users/{user_id}/unban"
+      body: "*"
+    };
+  }
+
+  // ListCharacters 获取角色列表(管理视角)
+  rpc ListCharacters(ListCharactersRequest) returns (ListCharactersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/admin/characters"
+    };
+  }
+
+  // ApproveCharacter 审核角色
+  rpc ApproveCharacter(ApproveCharacterRequest) returns (ApproveCharacterResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/admin/characters/{character_id}/approve"
+      body: "*"
+    };
+  }
+
+  // GetSystemStats 获取系统统计
+  rpc GetSystemStats(GetSystemStatsRequest) returns (GetSystemStatsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/admin/stats"
+    };
+  }
+
+  // HealthCheck 健康检查
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse) {
+    option (google.api.http) = {
+      get: "/health"
+    };
+  }
+}
+
+// ListUsersRequest 获取用户列表请求
+message ListUsersRequest {
+  int32 page = 1;           // 页码
+  int32 page_size = 2;      // 每页数量
+  string search = 3;        // 搜索关键词
+  string status = 4;        // 状态筛选: "active", "banned", "deleted"
+  string sort_by = 5;       // 排序字段
+  bool sort_desc = 6;       // 是否降序
+}
+
+// ListUsersResponse 获取用户列表响应
+message ListUsersResponse {
+  repeated AdminUser users = 1;  // 用户列表
+  int32 total = 2;               // 总数
+  int32 page = 3;                // 当前页
+  int32 page_size = 4;           // 每页数量
+}
+
+// GetUserDetailRequest 获取用户详情请求
+message GetUserDetailRequest {
+  int64 user_id = 1;  // 用户ID
+}
+
+// GetUserDetailResponse 获取用户详情响应
+message GetUserDetailResponse {
+  AdminUser user = 1;             // 用户信息
+  int64 total_conversations = 2;  // 总对话数
+  int64 total_messages = 3;       // 总消息数
+  int64 credit_balance = 4;       // 积分余额
+}
+
+// BanUserRequest 封禁用户请求
+message BanUserRequest {
+  int64 user_id = 1;     // 用户ID
+  string reason = 2;     // 封禁原因
+  int32 duration = 3;    // 封禁时长(天)，0表示永久
+}
+
+// BanUserResponse 封禁用户响应
+message BanUserResponse {
+  bool success = 1;                           // 是否成功
+  google.protobuf.Timestamp banned_until = 2; // 封禁截止时间
+}
+
+// UnbanUserRequest 解封用户请求
+message UnbanUserRequest {
+  int64 user_id = 1;  // 用户ID
+}
+
+// UnbanUserResponse 解封用户响应
+message UnbanUserResponse {
+  bool success = 1;  // 是否成功
+}
+
+// ListCharactersRequest 获取角色列表请求
+message ListCharactersRequest {
+  int32 page = 1;           // 页码
+  int32 page_size = 2;      // 每页数量
+  string status = 3;        // 状态: "pending", "approved", "rejected"
+  bool only_official = 4;   // 仅官方角色
+}
+
+// ListCharactersResponse 获取角色列表响应
+message ListCharactersResponse {
+  repeated AdminCharacter characters = 1;  // 角色列表
+  int32 total = 2;                         // 总数
+}
+
+// ApproveCharacterRequest 审核角色请求
+message ApproveCharacterRequest {
+  int64 character_id = 1;  // 角色ID
+  bool approved = 2;       // 是否通过
+  string reason = 3;       // 审核意见
+}
+
+// ApproveCharacterResponse 审核角色响应
+message ApproveCharacterResponse {
+  bool success = 1;  // 是否成功
+}
+
+// GetSystemStatsRequest 获取系统统计请求
+message GetSystemStatsRequest {
+  string period = 1;  // 统计周期: "day", "week", "month"
+}
+
+// GetSystemStatsResponse 获取系统统计响应
+message GetSystemStatsResponse {
+  int64 total_users = 1;          // 总用户数
+  int64 active_users = 2;         // 活跃用户数
+  int64 total_conversations = 3;  // 总对话数
+  int64 total_messages = 4;       // 总消息数
+  int64 total_characters = 5;     // 总角色数
+  int64 total_tokens_used = 6;    // 总Token消耗
+  repeated DailyStat daily_stats = 7;  // 每日统计
+}
+
+// HealthCheckRequest 健康检查请求
+message HealthCheckRequest {}
+
+// HealthCheckResponse 健康检查响应
+message HealthCheckResponse {
+  string status = 1;           // 状态: "healthy", "degraded", "unhealthy"
+  string version = 2;          // 服务版本
+  map<string, string> dependencies = 3;  // 依赖服务状态
+}
+
+// AdminUser 管理视角的用户信息
+message AdminUser {
+  int64 id = 1;                              // 用户ID
+  string email = 2;                          // 邮箱
+  string username = 3;                       // 用户名
+  string status = 4;                         // 状态: "active", "banned", "deleted"
+  int64 credit_balance = 5;                  // 积分余额
+  google.protobuf.Timestamp created_at = 6;  // 注册时间
+  google.protobuf.Timestamp last_active = 7; // 最后活跃时间
+  google.protobuf.Timestamp banned_until = 8; // 封禁截止时间
+}
+
+// AdminCharacter 管理视角的角色信息
+message AdminCharacter {
+  int64 id = 1;                              // 角色ID
+  string name = 2;                           // 角色名称
+  int64 creator_id = 3;                      // 创建者ID
+  string status = 4;                         // 状态: "pending", "approved", "rejected"
+  bool is_official = 5;                      // 是否官方
+  int64 usage_count = 6;                     // 使用次数
+  google.protobuf.Timestamp created_at = 7;  // 创建时间
+}
+
+// DailyStat 每日统计
+message DailyStat {
+  string date = 1;          // 日期 (YYYY-MM-DD)
+  int64 new_users = 2;      // 新增用户
+  int64 active_users = 3;   // 活跃用户
+  int64 messages = 4;       // 消息数
+  int64 tokens_used = 5;    // Token消耗
+}

@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+package conversation.v1;
+
+option go_package = "github.com/myy-chat/backend/golang/api/conversation/v1;v1";
+option java_multiple_files = true;
+option java_package = "conversation.v1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+// ConversationService 对话管理服务
+service ConversationService {
+  // CreateConversation 创建新对话
+  rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/conversations"
+      body: "*"
+    };
+  }
+
+  // SendMessage 发送消息
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/conversations/{conversation_id}/messages"
+      body: "*"
+    };
+  }
+
+  // GetMessages 获取历史消息
+  rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/conversations/{conversation_id}/messages"
+    };
+  }
+
+  // ListConversations 获取用户的对话列表
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/{user_id}/conversations"
+    };
+  }
+
+  // DeleteConversation 删除对话
+  rpc DeleteConversation(DeleteConversationRequest) returns (DeleteConversationResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/conversations/{conversation_id}"
+    };
+  }
+}
+
+// CreateConversationRequest 创建对话请求
+message CreateConversationRequest {
+  int64 user_id = 1;      // 用户ID
+  int64 character_id = 2; // 角色ID
+}
+
+// CreateConversationResponse 创建对话响应
+message CreateConversationResponse {
+  Conversation conversation = 1;  // 对话信息
+}
+
+// SendMessageRequest 发送消息请求
+message SendMessageRequest {
+  int64 conversation_id = 1;  // 对话ID
+  int64 user_id = 2;          // 用户ID
+  string content = 3;         // 消息内容
+}
+
+// SendMessageResponse 发送消息响应
+message SendMessageResponse {
+  Message user_message = 1;  // 用户消息
+  Message ai_message = 2;    // AI回复
+  int64 tokens_used = 3;     // 消耗的Token数
+  int64 credits_used = 4;    // 消耗的积分
+}
+
+// GetMessagesRequest 获取消息请求
+message GetMessagesRequest {
+  int64 conversation_id = 1;  // 对话ID
+  int32 page = 2;             // 页码(从1开始)
+  int32 page_size = 3;        // 每页数量
+}
+
+// GetMessagesResponse 获取消息响应
+message GetMessagesResponse {
+  repeated Message messages = 1;  // 消息列表
+  int32 total = 2;                // 总消息数
+  int32 page = 3;                 // 当前页
+  int32 page_size = 4;            // 每页数量
+}
+
+// ListConversationsRequest 获取对话列表请求
+message ListConversationsRequest {
+  int64 user_id = 1;   // 用户ID
+  int32 page = 2;      // 页码
+  int32 page_size = 3; // 每页数量
+}
+
+// ListConversationsResponse 获取对话列表响应
+message ListConversationsResponse {
+  repeated Conversation conversations = 1;  // 对话列表
+  int32 total = 2;                          // 总数
+}
+
+// DeleteConversationRequest 删除对话请求
+message DeleteConversationRequest {
+  int64 conversation_id = 1;  // 对话ID
+  int64 user_id = 2;          // 用户ID
+}
+
+// DeleteConversationResponse 删除对话响应
+message DeleteConversationResponse {
+  bool success = 1;  // 是否成功
+}
+
+// Conversation 对话实体
+message Conversation {
+  int64 id = 1;                              // 对话ID (Snowflake ID)
+  int64 user_id = 2;                         // 用户ID
+  int64 character_id = 3;                    // 角色ID
+  string title = 4;                          // 对话标题
+  google.protobuf.Timestamp created_at = 5;  // 创建时间
+  google.protobuf.Timestamp updated_at = 6;  // 更新时间
+}
+
+// Message 消息实体
+message Message {
+  int64 id = 1;                              // 消息ID (Snowflake ID)
+  int64 conversation_id = 2;                 // 对话ID
+  string role = 3;                           // 角色: "user" 或 "assistant"
+  string content = 4;                        // 消息内容
+  int64 tokens = 5;                          // Token数量
+  google.protobuf.Timestamp created_at = 6;  // 创建时间
+}

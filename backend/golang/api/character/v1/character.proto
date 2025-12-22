@@ -1,0 +1,139 @@
+syntax = "proto3";
+
+package character.v1;
+
+option go_package = "github.com/myy-chat/backend/golang/api/character/v1;v1";
+option java_multiple_files = true;
+option java_package = "character.v1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+// CharacterService AI角色管理服务
+service CharacterService {
+  // CreateCharacter 创建角色
+  rpc CreateCharacter(CreateCharacterRequest) returns (CreateCharacterResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/characters"
+      body: "*"
+    };
+  }
+
+  // UpdateCharacter 更新角色
+  rpc UpdateCharacter(UpdateCharacterRequest) returns (UpdateCharacterResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/characters/{character_id}"
+      body: "*"
+    };
+  }
+
+  // DeleteCharacter 删除角色
+  rpc DeleteCharacter(DeleteCharacterRequest) returns (DeleteCharacterResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/characters/{character_id}"
+    };
+  }
+
+  // GetCharacter 获取角色详情
+  rpc GetCharacter(GetCharacterRequest) returns (GetCharacterResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/characters/{character_id}"
+    };
+  }
+
+  // ListCharacters 获取角色列表
+  rpc ListCharacters(ListCharactersRequest) returns (ListCharactersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/characters"
+    };
+  }
+}
+
+// CreateCharacterRequest 创建角色请求
+message CreateCharacterRequest {
+  string name = 1;              // 角色名称
+  string avatar_url = 2;        // 头像URL
+  string description = 3;       // 角色描述
+  string system_prompt = 4;     // 系统提示词
+  string greeting = 5;          // 开场白
+  repeated string tags = 6;     // 标签
+  bool is_public = 7;           // 是否公开
+  int64 creator_id = 8;         // 创建者ID (自定义角色)
+}
+
+// CreateCharacterResponse 创建角色响应
+message CreateCharacterResponse {
+  Character character = 1;  // 角色信息
+}
+
+// UpdateCharacterRequest 更新角色请求
+message UpdateCharacterRequest {
+  int64 character_id = 1;       // 角色ID
+  string name = 2;              // 角色名称
+  string avatar_url = 3;        // 头像URL
+  string description = 4;       // 角色描述
+  string system_prompt = 5;     // 系统提示词
+  string greeting = 6;          // 开场白
+  repeated string tags = 7;     // 标签
+  bool is_public = 8;           // 是否公开
+}
+
+// UpdateCharacterResponse 更新角色响应
+message UpdateCharacterResponse {
+  Character character = 1;  // 更新后的角色信息
+}
+
+// DeleteCharacterRequest 删除角色请求
+message DeleteCharacterRequest {
+  int64 character_id = 1;  // 角色ID
+}
+
+// DeleteCharacterResponse 删除角色响应
+message DeleteCharacterResponse {
+  bool success = 1;  // 是否成功
+}
+
+// GetCharacterRequest 获取角色请求
+message GetCharacterRequest {
+  int64 character_id = 1;  // 角色ID
+}
+
+// GetCharacterResponse 获取角色响应
+message GetCharacterResponse {
+  Character character = 1;  // 角色信息
+}
+
+// ListCharactersRequest 获取角色列表请求
+message ListCharactersRequest {
+  int32 page = 1;           // 页码
+  int32 page_size = 2;      // 每页数量
+  string category = 3;      // 分类筛选
+  string search = 4;        // 搜索关键词
+  bool only_public = 5;     // 仅公开角色
+  int64 creator_id = 6;     // 指定创建者 (获取用户自定义角色)
+}
+
+// ListCharactersResponse 获取角色列表响应
+message ListCharactersResponse {
+  repeated Character characters = 1;  // 角色列表
+  int32 total = 2;                    // 总数
+  int32 page = 3;                     // 当前页
+  int32 page_size = 4;                // 每页数量
+}
+
+// Character AI角色实体
+message Character {
+  int64 id = 1;                              // 角色ID (Snowflake ID)
+  string name = 2;                           // 角色名称
+  string avatar_url = 3;                     // 头像URL
+  string description = 4;                    // 角色描述
+  string system_prompt = 5;                  // 系统提示词
+  string greeting = 6;                       // 开场白
+  repeated string tags = 7;                  // 标签
+  bool is_public = 8;                        // 是否公开
+  bool is_official = 9;                      // 是否官方角色
+  int64 creator_id = 10;                     // 创建者ID (0表示官方)
+  int64 usage_count = 11;                    // 使用次数
+  google.protobuf.Timestamp created_at = 12; // 创建时间
+  google.protobuf.Timestamp updated_at = 13; // 更新时间
+}
