@@ -314,6 +314,14 @@
 - **QR-007**: 系统必须实现幂等性保证（特别是积分扣除等关键操作）
 - **QR-008**: 系统必须实现并发安全（记忆写入、积分扣除等场景）
 
+**Frontend Quality Requirements**
+- **QR-009**: 前端代码必须使用 TypeScript strict mode
+- **QR-010**: 前端组件必须使用函数式组件和 React Hooks
+- **QR-011**: 前端样式必须使用 Tailwind CSS utility classes
+- **QR-012**: 前端必须支持深色模式和浅色模式切换
+- **QR-013**: 前端必须支持中文和英文双语切换
+- **QR-014**: 前端必须实现响应式设计，支持移动端和桌面端
+
 ### Key Entities
 
 - **User（用户）**: 平台的使用者，拥有账号、积分余额、多个AI角色、对话历史
@@ -407,6 +415,85 @@
 - **账号安全**: 必须实现登录失败锁定机制（5次失败后锁定15分钟）
 - **内容合规**: AI生成内容必须经过敏感词过滤，避免违规内容
 
+## Technology Stack
+
+### Frontend
+- **Framework**: React 19.2.0 with TypeScript 5.9.3
+- **Build Tool**: Vite 7.2.4
+- **Routing**: React Router DOM 7.11.0
+- **State Management**: React Context API
+  - AuthContext - 用户认证状态
+  - ChatContext - 聊天会话管理
+  - ThemeContext - 主题切换（深色/浅色）
+  - LanguageContext - 多语言切换（中文/英文）
+- **Styling**: Tailwind CSS 3.4.17 (Utility-first, Dark Mode support)
+- **Animation**: Framer Motion 12.23.26
+- **Icons**: Lucide React 0.562.0
+- **Internationalization**: 自定义 i18n 系统（中文/英文，300+ 翻译条目）
+
+### Frontend Architecture
+```
+frontend/src/
+├── components/           # 可复用组件
+│   ├── layout/          # 布局组件
+│   │   ├── AppLayout.tsx         # 主应用布局（侧边栏+主内容）
+│   │   └── ProtectedRoute.tsx    # 路由权限保护
+│   └── SearchFilterBar.tsx       # 搜索过滤组件
+├── context/             # React Context 状态管理
+│   ├── AuthContext.tsx           # 认证状态
+│   ├── ChatContext.tsx           # 聊天会话
+│   ├── ThemeContext.tsx          # 主题切换
+│   └── LanguageContext.tsx       # 多语言
+├── pages/               # 页面组件
+│   ├── LandingPage.tsx           # 落地页
+│   ├── LoginPage.tsx             # 登录/注册
+│   ├── Dashboard.tsx             # 我的角色
+│   ├── MarketplacePage.tsx       # 角色市场
+│   ├── ChatPage.tsx              # 聊天界面
+│   ├── CreatePage.tsx            # 创建/编辑角色
+│   └── ProfilePage.tsx           # 用户资料
+├── services/            # API 服务层
+│   └── mockApi.ts                # Mock API（开发阶段）
+├── types/               # TypeScript 类型定义
+│   └── index.ts
+└── lib/                 # 工具函数
+    └── utils.ts
+```
+
+### Backend
+- **Framework**: Kratos v2 (Go 微服务框架)
+- **Architecture**: Monorepo 大仓模式
+- **Communication**: gRPC + Protobuf（微服务间）, HTTP RESTful（对外 API）
+- **Dependency Injection**: Wire
+- **Configuration**: YAML + Protobuf
+
+### Backend Architecture
+```
+backend/golang/
+├── api/                 # Proto 定义（服务间共享）
+│   ├── user/v1/        # 用户服务 API
+│   ├── character/v1/   # 角色服务 API
+│   ├── chat/v1/        # 聊天服务 API
+│   └── admin/v1/       # 管理后台 API
+├── app/                 # 微服务实现
+│   └── {service}/
+│       ├── cmd/        # 服务入口
+│       ├── internal/   # 内部实现
+│       │   ├── biz/    # 业务逻辑层
+│       │   ├── data/   # 数据访问层
+│       │   ├── service/# gRPC/HTTP 服务层
+│       │   └── server/ # 服务器配置
+│       └── configs/    # 服务配置
+├── pkg/                 # 共享库
+└── third_party/        # 第三方 Proto
+```
+
+### Infrastructure (Planned)
+- **Database**: PostgreSQL（主库）, Redis（缓存/会话）
+- **Message Queue**: Kafka/NATS（异步处理）
+- **Container**: Docker + Kubernetes
+- **Observability**: OpenTelemetry + Prometheus + Grafana
+
 ## Out of Scope (for this version)
 
 - 语音对话功能（文字转语音、语音转文字）
@@ -415,7 +502,8 @@
 - 多用户群聊或AI角色间对话
 - 高级情感分析（面部表情、语调分析）
 - 区块链或NFT相关功能
-- 国际化和多语言支持
 - 移动端原生APP（优先Web响应式）
 - 微信小程序或微信公众号接入
 - 社交功能（用户间互动、分享AI角色）
+
+**已实现**: 国际化和多语言支持已在前端骨架中实现（中文/英文双语），不再属于 Out of Scope。

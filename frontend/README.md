@@ -1,117 +1,73 @@
-# MYY Chat Frontend
+# React + TypeScript + Vite
 
-Enterprise-grade AI companion platform frontend built with Next.js 14, TypeScript, and Tailwind CSS.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## Tech Stack
+Currently, two official plugins are available:
 
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript 5.x
-- **Styling**: Tailwind CSS 3.x
-- **UI Components**: Shadcn/ui (Radix UI primitives)
-- **State Management**: Zustand 4.x
-- **Icons**: Lucide React
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-## Getting Started
+## React Compiler
 
-### Prerequisites
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-- Node.js 18.x or later
-- npm, yarn, or pnpm
+## Expanding the ESLint configuration
 
-### Installation
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-```bash
-# Install dependencies
-npm install
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
 
-# Copy environment variables
-cp .env.example .env.local
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
 
-# Run development server
-npm run dev
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the application.
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-## Project Structure
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
 
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
 ```
-frontend/
-├── src/
-│   ├── app/              # Next.js App Router pages
-│   │   ├── layout.tsx    # Root layout
-│   │   └── page.tsx      # Home page
-│   ├── components/
-│   │   └── ui/          # Shadcn/ui components
-│   ├── lib/
-│   │   ├── api/         # API client and utilities
-│   │   ├── hooks/       # Custom React hooks
-│   │   └── utils/       # Utility functions
-│   └── styles/
-│       └── globals.css  # Global styles and Tailwind
-├── public/              # Static assets
-├── tests/
-│   └── e2e/            # End-to-end tests
-└── config files
-```
-
-## Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run start` - Start production server
-- `npm run lint` - Run ESLint
-- `npm run type-check` - Run TypeScript type checking
-
-## Adding Shadcn/UI Components
-
-```bash
-# Example: Add a button component
-npx shadcn-ui@latest add button
-
-# Example: Add a dialog component
-npx shadcn-ui@latest add dialog
-```
-
-## TypeScript Configuration
-
-This project uses strict TypeScript configuration:
-
-- Strict mode enabled
-- No implicit any
-- No unchecked indexed access
-- Unused locals and parameters warnings
-- No implicit returns
-
-## Environment Variables
-
-Create a `.env.local` file based on `.env.example`:
-
-- `NEXT_PUBLIC_API_URL` - Backend API URL (default: http://localhost:8080)
-
-## Development Guidelines
-
-1. **Type Safety**: Always define proper TypeScript types and interfaces
-2. **Components**: Use functional components with TypeScript
-3. **Styling**: Use Tailwind CSS utility classes, extract to components when needed
-4. **API Calls**: Centralize API logic in `src/lib/api`
-5. **State**: Use Zustand for global state, React hooks for local state
-6. **Documentation**: Add JSDoc comments for all exported functions and components
-
-## Building for Production
-
-```bash
-# Create optimized production build
-npm run build
-
-# Start production server
-npm run start
-```
-
-## Learn More
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [TypeScript Documentation](https://www.typescriptlang.org/docs/)
-- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
-- [Shadcn/ui Documentation](https://ui.shadcn.com)
-- [Zustand Documentation](https://docs.pmnd.rs/zustand)
