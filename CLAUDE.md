@@ -110,7 +110,6 @@ make new SERVICE=xxx # 创建新服务骨架
 
 - 001-ai-companion-platform: 添加完整技术选型
 - Frontend: React 19 + TypeScript + Vite 骨架实现
-- Backend: Kratos v2 微服务脚手架
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
