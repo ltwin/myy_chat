@@ -50,6 +50,9 @@ help:
 	@echo "  make build-{service}    - 构建指定服务"
 	@echo "  make run-{service}      - 运行指定服务"
 	@echo "  make wire-{service}     - 生成指定服务的 wire 代码"
+	@echo "  make test-{service}     - 测试指定服务"
+	@echo "  make test-coverage-{service} - 测试指定服务并生成覆盖率"
+	@echo "  make debug-{service}    - 调试模式运行 (Delve, port 2345)"
 	@echo ""
 	@echo "工具命令:"
 	@echo "  make clean              - 清理所有构建产物"
@@ -74,6 +77,7 @@ init:
 	go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
 	go install github.com/google/wire/cmd/wire@latest
 	go install github.com/envoyproxy/protoc-gen-validate@latest
+	go install github.com/go-delve/delve/cmd/dlv@latest
 	@echo "✓ 工具安装完成!"
 
 .PHONY: download
@@ -268,6 +272,47 @@ $(addprefix wire-,$(SERVICES)):
 		echo "✓ $$svc wire 生成完成!"; \
 	else \
 		echo "✗ app/$$svc/cmd/$$svc/wire.go 不存在"; \
+		exit 1; \
+	fi
+
+# 测试指定服务
+.PHONY: $(addprefix test-,$(SERVICES))
+$(addprefix test-,$(SERVICES)):
+	@svc=$(@:test-%=%); \
+	echo ">>> 测试 $$svc..."; \
+	if [ -d app/$$svc ]; then \
+		go test -v -race ./app/$$svc/...; \
+		echo "✓ $$svc 测试完成!"; \
+	else \
+		echo "✗ app/$$svc 不存在"; \
+		exit 1; \
+	fi
+
+# 测试指定服务并生成覆盖率
+.PHONY: $(addprefix test-coverage-,$(SERVICES))
+$(addprefix test-coverage-,$(SERVICES)):
+	@svc=$(@:test-coverage-%=%); \
+	echo ">>> 测试 $$svc 并生成覆盖率..."; \
+	if [ -d app/$$svc ]; then \
+		go test -v -race -coverprofile=app/$$svc/coverage.out -covermode=atomic ./app/$$svc/...; \
+		go tool cover -html=app/$$svc/coverage.out -o app/$$svc/coverage.html; \
+		echo "✓ $$svc 覆盖率报告: app/$$svc/coverage.html"; \
+	else \
+		echo "✗ app/$$svc 不存在"; \
+		exit 1; \
+	fi
+
+# 调试模式运行指定服务 (使用 delve)
+.PHONY: $(addprefix debug-,$(SERVICES))
+$(addprefix debug-,$(SERVICES)):
+	@svc=$(@:debug-%=%); \
+	echo ">>> 调试 $$svc (Delve headless mode, port 2345)..."; \
+	echo "    连接方式: dlv connect :2345"; \
+	echo "    或使用 IDE 远程调试连接 localhost:2345"; \
+	if [ -d app/$$svc/cmd/$$svc ]; then \
+		cd app/$$svc && dlv debug ./cmd/$$svc --headless --listen=:2345 --api-version=2 --accept-multiclient -- -conf ./configs; \
+	else \
+		echo "✗ app/$$svc/cmd/$$svc 不存在"; \
 		exit 1; \
 	fi
 

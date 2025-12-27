@@ -32,6 +32,9 @@ help:
 	@echo "  make generate      - 生成 wire 依赖注入"
 	@echo "  make build         - 构建当前服务"
 	@echo "  make run           - 运行当前服务"
+	@echo "  make test          - 运行单元测试"
+	@echo "  make test-coverage - 测试并生成覆盖率"
+	@echo "  make debug         - 调试模式 (Delve, port 2345)"
 	@echo "  make clean         - 清理构建产物"
 	@echo ""
 
@@ -123,6 +126,19 @@ test-coverage:
 	go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "✓ 覆盖率报告: coverage.html"
+
+.PHONY: debug
+# 调试模式运行 (使用 Delve)
+debug:
+	@echo ">>> 调试 $(SERVICE) (Delve headless mode, port 2345)..."
+	@echo "    连接方式: dlv connect :2345"
+	@echo "    或使用 IDE 远程调试连接 localhost:2345"
+	@if [ -d cmd/$(SERVICE) ]; then \
+		dlv debug ./cmd/$(SERVICE) --headless --listen=:2345 --api-version=2 --accept-multiclient -- -conf ./configs; \
+	else \
+		echo "✗ cmd/$(SERVICE) 不存在"; \
+		exit 1; \
+	fi
 
 # ================================================================
 # 快捷命令
