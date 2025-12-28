@@ -50,7 +50,7 @@ Each implementation phase MUST include:
 - [X] T008 [P] Setup Go testing framework with testify and gomock in each Golang service
 - [X] T009 [P] Setup Python testing framework with pytest, pytest-asyncio, pytest-cov in each Python service
 - [X] T010 [P] Setup Playwright for frontend E2E testing at frontend/tests/e2e/
-- [ ] T236 [P] Setup Vitest for frontend unit testing at frontend/ with vitest.config.ts, @testing-library/react, and sample component tests
+- [X] T236 [P] Setup Vitest for frontend unit testing at frontend/ with vitest.config.ts, @testing-library/react, and sample component tests
 - [X] T011 [P] Configure Chinese comment and English logging standards document in docs/development.md
 - [X] T012 [P] Setup pre-commit hooks for linting and testing in .pre-commit-config.yaml
 - [X] T013 [P] Create shared Protobuf definitions directory at backend/proto/ with user.proto, conversation.proto, memory.proto
@@ -62,7 +62,7 @@ Each implementation phase MUST include:
 
 ---
 
-## Phase 2: Foundational (Blocking Prerequisites) (57 tasks)
+## Phase 2: Foundational (Blocking Prerequisites) (65 tasks)
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
 
@@ -70,36 +70,36 @@ Each implementation phase MUST include:
 
 ### Database & ID Generation (10 tasks)
 
-- [ ] T019 Implement Snowflake ID generator library in backend/golang/pkg/snowflake/generator.go using github.com/bwmarrin/snowflake
-- [ ] T020 Write unit tests for Snowflake ID generator in backend/golang/pkg/snowflake/generator_test.go
-- [ ] T021 Implement Snowflake ID generator library in backend/python/common/snowflake.py using pysnowflake
-- [ ] T022 Write unit tests for Python Snowflake ID generator in backend/python/common/test_snowflake.py
-- [ ] T023 Create PostgreSQL initialization script at deployments/postgres/init.sql with pgvector extension
-- [ ] T024 Create database migration 001_create_users_table.sql in backend/golang/migrations/ with BIGINT id (Snowflake ID)
-- [ ] T025 Create database migration 002_create_user_profiles_table.sql with BIGINT user_id
-- [ ] T026 Create database migration 003_create_characters_table.sql with BIGINT id and user_id
-- [ ] T027 Create database migration 004_create_conversations_table.sql with BIGINT id, user_id, character_id
-- [ ] T028 Create database migration 005_create_messages_table.sql with BIGINT id, conversation_id
+- [X] T019 Implement Snowflake ID generator library in backend/golang/pkg/snowflake/generator.go using github.com/bwmarrin/snowflake
+- [X] T020 Write unit tests for Snowflake ID generator in backend/golang/pkg/snowflake/generator_test.go
+- [X] T021 Implement Snowflake ID generator library in backend/python/common/snowflake.py using pysnowflake
+- [X] T022 Write unit tests for Python Snowflake ID generator in backend/python/common/test_snowflake.py
+- [X] T023 Create PostgreSQL initialization script at deployments/postgres/init.sql with pgvector extension
+- [X] T024 Create database migration 001_create_users_table.sql in backend/golang/migrations/ with BIGINT id (Snowflake ID)
+- [X] T025 Create database migration 002_create_user_profiles_table.sql with BIGINT user_id
+- [X] T026 Create database migration 003_create_characters_table.sql with BIGINT id and user_id
+- [X] T027 Create database migration 004_create_conversations_table.sql with BIGINT id, user_id, character_id
+- [X] T028 Create database migration 005_create_messages_table.sql with BIGINT id, conversation_id
 
 ### Protobuf & gRPC Setup (8 tasks)
 
-- [ ] T029 [P] Copy user_service.proto from specs/001-ai-companion-platform/contracts/ to backend/golang/api/user/v1/
-- [ ] T030 [P] Copy conversation_service.proto from specs/001-ai-companion-platform/contracts/ to backend/golang/api/conversation/v1/
-- [ ] T031 [P] Copy memory_service.proto from specs/001-ai-companion-platform/contracts/ to backend/golang/api/memory/v1/
-- [ ] T032 [P] Create Makefile for Protobuf compilation in backend/golang/Makefile with Go and Python targets
-- [ ] T033 [P] Compile user_service.proto to generate Go code in backend/golang/api/user/v1/
-- [ ] T034 [P] Compile conversation_service.proto to generate Go code in backend/golang/api/conversation/v1/
-- [ ] T035 [P] Compile memory_service.proto to generate Go code in backend/golang/api/memory/v1/
-- [ ] T036 [P] Compile all proto files to generate Python code in backend/python/proto/
+- [X] T029 [P] Copy user_service.proto from specs/001-ai-companion-platform/contracts/ to backend/golang/api/user/v1/
+- [X] T030 [P] Copy conversation_service.proto from specs/001-ai-companion-platform/contracts/ to backend/golang/api/conversation/v1/
+- [X] T031 [P] Copy memory_service.proto from specs/001-ai-companion-platform/contracts/ to backend/golang/api/memory/v1/
+- [X] T032 [P] Create Makefile for Protobuf compilation in backend/golang/Makefile with Go and Python targets
+- [X] T033 [P] Compile user_service.proto to generate Go code in backend/golang/api/user/v1/
+- [X] T034 [P] Compile conversation_service.proto to generate Go code in backend/golang/api/conversation/v1/
+- [X] T035 [P] Compile memory_service.proto to generate Go code in backend/golang/api/memory/v1/
+- [X] T036 [P] Compile all proto files to generate Python code in backend/python/proto/
 
 ### Shared Middleware & Infrastructure (12 tasks)
 
-- [ ] T037 Implement JWT authentication middleware in backend/golang/pkg/middleware/auth.go with token validation
-- [ ] T038 Write unit tests for JWT middleware in backend/golang/pkg/middleware/auth_test.go
-- [ ] T039 [P] Implement logging middleware with English logs in backend/golang/pkg/middleware/logging.go using structured logging
-- [ ] T040 [P] Write unit tests for logging middleware in backend/golang/pkg/middleware/logging_test.go
-- [ ] T041 [P] Implement error handling middleware in backend/golang/pkg/middleware/error.go with standard error codes
-- [ ] T042 [P] Write unit tests for error handling middleware in backend/golang/pkg/middleware/error_test.go
+- [X] T037 Implement JWT authentication middleware in backend/golang/pkg/middleware/auth.go with token validation
+- [X] T038 Write unit tests for JWT middleware in backend/golang/pkg/middleware/auth_test.go
+- [X] T039 [P] Implement logging middleware with English logs in backend/golang/pkg/middleware/logging.go using structured logging
+- [X] T040 [P] Write unit tests for logging middleware in backend/golang/pkg/middleware/logging_test.go
+- [X] T041 [P] Implement error handling middleware in backend/golang/pkg/middleware/error.go with standard error codes
+- [X] T042 [P] Write unit tests for error handling middleware in backend/golang/pkg/middleware/error_test.go
 - [ ] T043 [P] Implement distributed tracing middleware in backend/golang/pkg/middleware/tracing.go using OpenTelemetry
 - [ ] T044 [P] Implement Redis connection pool library in backend/golang/pkg/redis/client.go
 - [ ] T045 [P] Write unit tests for Redis client in backend/golang/pkg/redis/client_test.go
@@ -117,7 +117,7 @@ Each implementation phase MUST include:
 - [ ] T052 [P] Scaffold llm-agent-service with FastAPI + gRPC in backend/python/llm-agent-service/ (FastAPI for health/debug, gRPC for service communication, calls LiteLLM Proxy for LLM)
 - [ ] T053 [P] Scaffold memory-processor with FastAPI + gRPC in backend/python/memory-processor/ (FastAPI for health/debug, gRPC for service communication)
 
-### Docker & Deployment (10 tasks)
+### Docker & Deployment (18 tasks)
 
 - [ ] T054 Create PostgreSQL 16 service configuration in deployments/docker-compose.dev.yml with pgvector extension
 - [ ] T055 Create Redis 7 service configuration in deployments/docker-compose.dev.yml
@@ -129,6 +129,17 @@ Each implementation phase MUST include:
 - [ ] T061 [P] Create Dockerfile for llm-agent-service in backend/python/llm-agent-service/Dockerfile
 - [ ] T062 [P] Create Dockerfile for memory-processor in backend/python/memory-processor/Dockerfile
 - [ ] T063 Complete docker-compose.dev.yml with all services, networks, and volumes
+
+#### APISIX API Gateway (FR-071) (8 tasks)
+
+- [ ] T255 [INFRA] Add APISIX to deployments/docker-compose.dev.yml (standalone mode with etcd) (FR-071)
+- [ ] T256 [INFRA] Create APISIX main configuration in infra/apisix/config.yaml (admin API, routes, upstreams) (FR-071a)
+- [ ] T257 [INFRA] Configure JWT Auth plugin in infra/apisix/plugins/jwt-auth.yaml (public/private routes, token validation) (FR-071b)
+- [ ] T258 [INFRA] Configure rate limiting plugin in infra/apisix/plugins/rate-limit.yaml (global and route-level limits) (FR-071c)
+- [ ] T259 [INFRA] Configure circuit breaker plugin in infra/apisix/plugins/circuit-breaker.yaml (unhealthy threshold, recovery time) (FR-071d)
+- [ ] T260 [INFRA] Configure CORS plugin in infra/apisix/plugins/cors.yaml (allowed origins, methods, headers) (FR-071e)
+- [ ] T261 [INFRA] Configure OpenTelemetry plugin in infra/apisix/plugins/otel.yaml (trace propagation, sampling rate) (FR-071f)
+- [ ] T262 [INFRA] Write APISIX Gateway integration tests in tests/integration/gateway_test.go (route verification, auth flow, rate limiting)
 
 ### LiteLLM Proxy 部署 (FR-061 ~ FR-068) (6 tasks)
 
@@ -684,10 +695,10 @@ Task T095: "Write unit tests for Message entity"
 ### MVP First (US1 + US2 Only) - Recommended ✅
 
 1. Complete Phase 1: Setup (19 tasks)
-2. Complete Phase 2: Foundational (57 tasks) - CRITICAL, blocks all stories
+2. Complete Phase 2: Foundational (65 tasks) - CRITICAL, blocks all stories
 3. Complete Phase 3: User Story 1 (68 tasks) - Basic conversation with LLM failover, multi-device sync, content moderation, and account deletion
 4. Complete Phase 4: User Story 2 (44 tasks) - AI memory
-5. **STOP and VALIDATE**: Test US1+US2 independently (188 tasks total)
+5. **STOP and VALIDATE**: Test US1+US2 independently (196 tasks total)
 6. Deploy MVP and gather user feedback
 
 ### Advanced Memory (Recommended for AI Companion) ✅
@@ -733,11 +744,11 @@ With multiple developers:
 
 ## Task Summary
 
-**Total Tasks**: 344 tasks
+**Total Tasks**: 352 tasks
 
 **By Phase**:
 - Phase 1 (Setup): 19 tasks (18 原有 + 1 Vitest 配置)
-- Phase 2 (Foundational): 57 tasks (45 原有 + 6 LiteLLM Proxy + 4 积分计费 + 2 级联删除)
+- Phase 2 (Foundational): 65 tasks (45 原有 + 6 LiteLLM Proxy + 4 积分计费 + 2 级联删除 + 8 APISIX Gateway)
 - Phase 3 (US1 - Basic Conversation): 68 tasks (57 原有 + 2 登录锁定 + 4 超时加载状态 + 5 内容审核)
 - Phase 4 (US2 - AI Memory): 44 tasks (42 原有 + 2 记忆编辑组件)
 - Phase 5 (Long-Term Memory): 90 tasks (5-layer architecture with Neo4j)
@@ -771,7 +782,7 @@ With multiple developers:
 
 **Parallel Opportunities**:
 - Phase 1: 17 parallelizable tasks
-- Phase 2: 25 parallelizable tasks
+- Phase 2: 33 parallelizable tasks
 - Phase 3: 10 parallelizable tasks (entity models)
 - Phase 4: 8 parallelizable tasks (entity models)
 - Phase 5: 8 parallelizable tasks (Neo4j + entity models)

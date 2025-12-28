@@ -356,6 +356,16 @@
 - **FR-067**: 系统必须记录所有 LLM 调用日志，包括请求模型、用户标识、Token 消耗（input/output）、延迟（ms）、成本（USD）、响应状态等，支持后续分析和审计
 - **FR-068**: LLM Gateway 必须支持 Redis 分布式限流，确保多实例部署时限流策略在所有实例间一致生效
 
+**API Gateway 服务**
+- **FR-071**: 系统必须部署 APISIX 作为统一 API Gateway，为所有外部请求提供单一入口
+  - **FR-071a**: Gateway 必须实现请求路由，根据 URL 路径将请求转发到对应的后端微服务
+  - **FR-071b**: Gateway 必须集成 JWT 认证插件，在网关层统一验证用户身份
+  - **FR-071c**: Gateway 必须支持全局和路由级别的限流配置（RPM/RPS）
+  - **FR-071d**: Gateway 必须支持熔断机制，当后端服务不可用时返回友好错误
+  - **FR-071e**: Gateway 必须统一处理 CORS 跨域请求
+  - **FR-071f**: Gateway 必须支持请求日志和链路追踪（集成 OpenTelemetry）
+  - **FR-071g**: Gateway 必须支持 gRPC 代理或 HTTP/gRPC 协议转换
+
 ### Quality Requirements (MyY Chat Constitution)
 
 - **QR-001**: 系统必须达到≥70%的测试覆盖率（每个微服务）

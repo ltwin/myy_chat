@@ -7,116 +7,23 @@ option java_multiple_files = true;
 option java_package = "user.v1";
 
 import "google/api/annotations.proto";
-import "google/protobuf/timestamp.proto";
 
-// UserService 用户认证与管理服务
-service UserService {
-  // Register 用户注册
-  rpc Register(RegisterRequest) returns (RegisterResponse) {
+// Service is the user service definition.
+service Service {
+  // Hello is a simple hello world endpoint.
+  rpc Hello(HelloRequest) returns (HelloResponse) {
     option (google.api.http) = {
-      post: "/api/v1/users/register"
-      body: "*"
-    };
-  }
-
-  // Login 用户登录
-  rpc Login(LoginRequest) returns (LoginResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/users/login"
-      body: "*"
-    };
-  }
-
-  // GetUser 获取用户信息
-  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/users/{user_id}"
-    };
-  }
-
-  // UpdateProfile 更新用户画像
-  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/users/{user_id}/profile"
-      body: "*"
-    };
-  }
-
-  // DeleteAccount 删除账号(30天冷静期)
-  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse) {
-    option (google.api.http) = {
-      delete: "/api/v1/users/{user_id}"
+      get: "/api/v1/user/hello"
     };
   }
 }
 
-// RegisterRequest 注册请求
-message RegisterRequest {
-  string email = 1;     // 邮箱
-  string password = 2;  // 密码
-  string username = 3;  // 用户名(可选)
+// HelloRequest is the request for Hello.
+message HelloRequest {
+  string name = 1;  // Name to greet
 }
 
-// RegisterResponse 注册响应
-message RegisterResponse {
-  int64 user_id = 1;           // 用户ID (Snowflake ID)
-  string access_token = 2;      // 访问令牌
-  string refresh_token = 3;     // 刷新令牌
-  int64 initial_credits = 4;    // 初始积分(100)
-}
-
-// LoginRequest 登录请求
-message LoginRequest {
-  string email = 1;     // 邮箱
-  string password = 2;  // 密码
-}
-
-// LoginResponse 登录响应
-message LoginResponse {
-  int64 user_id = 1;         // 用户ID
-  string access_token = 2;    // 访问令牌
-  string refresh_token = 3;   // 刷新令牌
-  User user = 4;              // 用户信息
-}
-
-// GetUserRequest 获取用户请求
-message GetUserRequest {
-  int64 user_id = 1;  // 用户ID
-}
-
-// GetUserResponse 获取用户响应
-message GetUserResponse {
-  User user = 1;  // 用户信息
-}
-
-// UpdateProfileRequest 更新画像请求
-message UpdateProfileRequest {
-  int64 user_id = 1;      // 用户ID
-  string username = 2;    // 用户名
-  string avatar_url = 3;  // 头像URL
-}
-
-// UpdateProfileResponse 更新画像响应
-message UpdateProfileResponse {
-  User user = 1;  // 更新后的用户信息
-}
-
-// DeleteAccountRequest 删除账号请求
-message DeleteAccountRequest {
-  int64 user_id = 1;  // 用户ID
-}
-
-// DeleteAccountResponse 删除账号响应
-message DeleteAccountResponse {
-  google.protobuf.Timestamp deletion_scheduled_at = 1;  // 预定删除时间(30天后)
-}
-
-// User 用户实体
-message User {
-  int64 id = 1;                              // 用户ID (Snowflake ID)
-  string email = 2;                          // 邮箱
-  string username = 3;                       // 用户名
-  string avatar_url = 4;                     // 头像URL
-  google.protobuf.Timestamp created_at = 5;  // 创建时间
-  google.protobuf.Timestamp updated_at = 6;  // 更新时间
+// HelloResponse is the response for Hello.
+message HelloResponse {
+  string message = 1;  // Greeting message
 }

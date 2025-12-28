@@ -7,140 +7,23 @@ option java_multiple_files = true;
 option java_package = "billing.v1";
 
 import "google/api/annotations.proto";
-import "google/protobuf/timestamp.proto";
 
-// BillingService 积分计费服务
-service BillingService {
-  // GetCreditBalance 获取积分余额
-  rpc GetCreditBalance(GetCreditBalanceRequest) returns (GetCreditBalanceResponse) {
+// Service is the billing service definition.
+service Service {
+  // Hello is a simple hello world endpoint.
+  rpc Hello(HelloRequest) returns (HelloResponse) {
     option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/credits"
-    };
-  }
-
-  // DeductCredits 扣除积分
-  rpc DeductCredits(DeductCreditsRequest) returns (DeductCreditsResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/users/{user_id}/credits/deduct"
-      body: "*"
-    };
-  }
-
-  // AddCredits 充值积分
-  rpc AddCredits(AddCreditsRequest) returns (AddCreditsResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/users/{user_id}/credits/add"
-      body: "*"
-    };
-  }
-
-  // GetTransactionHistory 获取交易历史
-  rpc GetTransactionHistory(GetTransactionHistoryRequest) returns (GetTransactionHistoryResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/credits/transactions"
-    };
-  }
-
-  // GetUsageStats 获取使用统计
-  rpc GetUsageStats(GetUsageStatsRequest) returns (GetUsageStatsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/usage/stats"
+      get: "/api/v1/billing/hello"
     };
   }
 }
 
-// GetCreditBalanceRequest 获取积分余额请求
-message GetCreditBalanceRequest {
-  int64 user_id = 1;  // 用户ID
+// HelloRequest is the request for Hello.
+message HelloRequest {
+  string name = 1;  // Name to greet
 }
 
-// GetCreditBalanceResponse 获取积分余额响应
-message GetCreditBalanceResponse {
-  int64 balance = 1;              // 当前余额
-  int64 total_earned = 2;         // 累计获得
-  int64 total_spent = 3;          // 累计消费
-  int64 daily_usage_limit = 4;    // 每日使用限额
-  int64 today_used = 5;           // 今日已使用
-}
-
-// DeductCreditsRequest 扣除积分请求
-message DeductCreditsRequest {
-  int64 user_id = 1;              // 用户ID
-  int64 amount = 2;               // 扣除金额
-  string reason = 3;              // 扣除原因
-  string idempotency_key = 4;     // 幂等性键
-  int64 conversation_id = 5;      // 关联对话ID(可选)
-  int64 message_id = 6;           // 关联消息ID(可选)
-}
-
-// DeductCreditsResponse 扣除积分响应
-message DeductCreditsResponse {
-  bool success = 1;               // 是否成功
-  int64 remaining_balance = 2;    // 剩余余额
-  string transaction_id = 3;      // 交易ID
-}
-
-// AddCreditsRequest 充值积分请求
-message AddCreditsRequest {
-  int64 user_id = 1;          // 用户ID
-  int64 amount = 2;           // 充值金额
-  string source = 3;          // 来源: "purchase", "gift", "refund"
-  string idempotency_key = 4; // 幂等性键
-}
-
-// AddCreditsResponse 充值积分响应
-message AddCreditsResponse {
-  bool success = 1;            // 是否成功
-  int64 new_balance = 2;       // 新余额
-  string transaction_id = 3;   // 交易ID
-}
-
-// GetTransactionHistoryRequest 获取交易历史请求
-message GetTransactionHistoryRequest {
-  int64 user_id = 1;       // 用户ID
-  int32 page = 2;          // 页码
-  int32 page_size = 3;     // 每页数量
-  string type_filter = 4;  // 类型筛选: "deduct", "add", "all"
-}
-
-// GetTransactionHistoryResponse 获取交易历史响应
-message GetTransactionHistoryResponse {
-  repeated CreditTransaction transactions = 1;  // 交易列表
-  int32 total = 2;                              // 总数
-  int32 page = 3;                               // 当前页
-  int32 page_size = 4;                          // 每页数量
-}
-
-// GetUsageStatsRequest 获取使用统计请求
-message GetUsageStatsRequest {
-  int64 user_id = 1;       // 用户ID
-  string period = 2;       // 统计周期: "day", "week", "month"
-}
-
-// GetUsageStatsResponse 获取使用统计响应
-message GetUsageStatsResponse {
-  int64 total_tokens = 1;            // 总Token消耗
-  int64 total_messages = 2;          // 总消息数
-  int64 total_conversations = 3;     // 总对话数
-  int64 total_credits_used = 4;      // 总积分消耗
-  repeated DailyUsage daily_usage = 5;  // 每日使用明细
-}
-
-// CreditTransaction 积分交易记录
-message CreditTransaction {
-  string id = 1;                             // 交易ID
-  int64 user_id = 2;                         // 用户ID
-  int64 amount = 3;                          // 金额(正数为收入，负数为支出)
-  string type = 4;                           // 类型: "deduct", "add", "refund"
-  string reason = 5;                         // 原因
-  int64 balance_after = 6;                   // 交易后余额
-  google.protobuf.Timestamp created_at = 7;  // 创建时间
-}
-
-// DailyUsage 每日使用统计
-message DailyUsage {
-  string date = 1;         // 日期 (YYYY-MM-DD)
-  int64 tokens = 2;        // Token消耗
-  int64 messages = 3;      // 消息数
-  int64 credits_used = 4;  // 积分消耗
+// HelloResponse is the response for Hello.
+message HelloResponse {
+  string message = 1;  // Greeting message
 }

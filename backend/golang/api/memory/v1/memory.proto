@@ -7,156 +7,23 @@ option java_multiple_files = true;
 option java_package = "memory.v1";
 
 import "google/api/annotations.proto";
-import "google/protobuf/timestamp.proto";
 
-// MemoryService 记忆存储与检索服务
-service MemoryService {
-  // SaveMemory 保存记忆
-  rpc SaveMemory(SaveMemoryRequest) returns (SaveMemoryResponse) {
+// Service is the memory service definition.
+service Service {
+  // Hello is a simple hello world endpoint.
+  rpc Hello(HelloRequest) returns (HelloResponse) {
     option (google.api.http) = {
-      post: "/api/v1/memories"
-      body: "*"
-    };
-  }
-
-  // RetrieveMemories 检索相关记忆
-  rpc RetrieveMemories(RetrieveMemoriesRequest) returns (RetrieveMemoriesResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/memories/retrieve"
-      body: "*"
-    };
-  }
-
-  // GetUserPortrait 获取用户画像
-  rpc GetUserPortrait(GetUserPortraitRequest) returns (GetUserPortraitResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/characters/{character_id}/portrait"
-    };
-  }
-
-  // UpdateRelationship 更新关系亲密度
-  rpc UpdateRelationship(UpdateRelationshipRequest) returns (UpdateRelationshipResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/users/{user_id}/characters/{character_id}/relationship"
-      body: "*"
-    };
-  }
-
-  // DetectContradictions 检测记忆矛盾
-  rpc DetectContradictions(DetectContradictionsRequest) returns (DetectContradictionsResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/memories/contradictions"
-      body: "*"
+      get: "/api/v1/memory/hello"
     };
   }
 }
 
-// SaveMemoryRequest 保存记忆请求
-message SaveMemoryRequest {
-  int64 user_id = 1;                  // 用户ID
-  int64 character_id = 2;             // 角色ID
-  string content = 3;                 // 记忆内容
-  MemoryType type = 4;                // 记忆类型
-  float importance = 5;               // 重要性(0-1)
-  repeated float embedding = 6;       // Embedding向量
+// HelloRequest is the request for Hello.
+message HelloRequest {
+  string name = 1;  // Name to greet
 }
 
-// SaveMemoryResponse 保存记忆响应
-message SaveMemoryResponse {
-  Memory memory = 1;  // 保存的记忆
-}
-
-// RetrieveMemoriesRequest 检索记忆请求
-message RetrieveMemoriesRequest {
-  int64 user_id = 1;            // 用户ID
-  int64 character_id = 2;       // 角色ID
-  string query = 3;             // 查询内容
-  int32 top_k = 4;              // 返回前K个(默认5)
-  MemoryType type_filter = 5;   // 类型过滤(可选)
-}
-
-// RetrieveMemoriesResponse 检索记忆响应
-message RetrieveMemoriesResponse {
-  repeated Memory memories = 1;  // 检索到的记忆列表
-}
-
-// GetUserPortraitRequest 获取用户画像请求
-message GetUserPortraitRequest {
-  int64 user_id = 1;       // 用户ID
-  int64 character_id = 2;  // 角色ID
-}
-
-// GetUserPortraitResponse 获取用户画像响应
-message GetUserPortraitResponse {
-  UserPortrait portrait = 1;  // 用户画像
-}
-
-// UpdateRelationshipRequest 更新关系请求
-message UpdateRelationshipRequest {
-  int64 user_id = 1;        // 用户ID
-  int64 character_id = 2;   // 角色ID
-  float closeness = 3;      // 亲密度(0-100)
-  float emotional_bond = 4; // 情感纽带(0-100)
-}
-
-// UpdateRelationshipResponse 更新关系响应
-message UpdateRelationshipResponse {
-  Relationship relationship = 1;  // 更新后的关系
-}
-
-// DetectContradictionsRequest 检测矛盾请求
-message DetectContradictionsRequest {
-  int64 user_id = 1;       // 用户ID
-  int64 character_id = 2;  // 角色ID
-  string new_memory = 3;   // 新记忆内容
-}
-
-// DetectContradictionsResponse 检测矛盾响应
-message DetectContradictionsResponse {
-  bool has_contradiction = 1;                 // 是否有矛盾
-  repeated Memory contradicted_memories = 2;  // 矛盾的旧记忆
-  string resolution = 3;                      // 解决方案建议
-}
-
-// MemoryType 记忆类型枚举
-enum MemoryType {
-  MEMORY_TYPE_UNSPECIFIED = 0;  // 未指定
-  TEMPORARY = 1;                 // 临时记忆(24小时)
-  USER_PORTRAIT = 2;             // 用户画像(长期)
-  EMOTIONAL_STATE = 3;           // 情感状态
-  RELATIONSHIP = 4;              // 关系记忆
-  EVENT = 5;                     // 事件记忆
-  CORE = 6;                      // 核心记忆(最重要)
-}
-
-// Memory 记忆实体
-message Memory {
-  int64 id = 1;                              // 记忆ID (Snowflake ID)
-  int64 user_id = 2;                         // 用户ID
-  int64 character_id = 3;                    // 角色ID
-  string content = 4;                        // 记忆内容
-  MemoryType type = 5;                       // 记忆类型
-  float importance = 6;                      // 重要性(0-1)
-  repeated float embedding = 7;              // Embedding向量(1536维)
-  google.protobuf.Timestamp created_at = 8;  // 创建时间
-  google.protobuf.Timestamp expires_at = 9;  // 过期时间(临时记忆)
-}
-
-// UserPortrait 用户画像
-message UserPortrait {
-  int64 user_id = 1;                         // 用户ID
-  int64 character_id = 2;                    // 角色ID
-  map<string, string> attributes = 3;        // 用户属性(key-value)
-  repeated string interests = 4;             // 兴趣爱好
-  repeated string preferences = 5;           // 偏好设置
-  google.protobuf.Timestamp updated_at = 6;  // 更新时间
-}
-
-// Relationship 关系实体
-message Relationship {
-  int64 user_id = 1;                         // 用户ID
-  int64 character_id = 2;                    // 角色ID
-  float closeness = 3;                       // 亲密度(0-100)
-  float emotional_bond = 4;                  // 情感纽带(0-100)
-  google.protobuf.Timestamp updated_at = 5;  // 更新时间
+// HelloResponse is the response for Hello.
+message HelloResponse {
+  string message = 1;  // Greeting message
 }

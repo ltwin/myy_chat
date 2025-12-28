@@ -1,11 +1,15 @@
-# LLM Service Dependencies
+# LLM Agent Service Dependencies
+
+# Web Framework
 fastapi==0.121.0
 uvicorn[standard]==0.37.0
+pydantic==2.10.6
+pydantic-settings==2.7.0
+
+# gRPC
 grpcio==1.70.0
 grpcio-tools==1.70.0
 protobuf==4.25.3
-pydantic==2.10.6
-pydantic-settings==2.7.0
 
 # LLM & AI
 langchain==0.3.13
@@ -15,11 +19,22 @@ litellm==1.59.3
 openai==1.59.6
 anthropic==0.43.2
 
+# Database
+asyncpg==0.30.0
+sqlalchemy==2.0.36
+
 # Utilities
 python-dotenv==1.0.1
 httpx==0.28.1
 redis==5.2.1
 structlog==24.4.0
+
+# Observability
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+opentelemetry-instrumentation-fastapi==0.50b0
+opentelemetry-instrumentation-grpc==0.50b0
+opentelemetry-exporter-otlp==1.29.0
 
 # Development
 pytest==8.3.4
