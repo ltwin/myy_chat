@@ -27,6 +27,17 @@ service MemoryService {
 
   // 删除记忆
   rpc DeleteMemory(DeleteMemoryRequest) returns (DeleteMemoryResponse);
+
+  // 上报社区安全/策略审计事件（用于风控与后台治理）
+  rpc ReportAuditEvent(ReportAuditEventRequest) returns (ReportAuditEventResponse);
+}
+
+// 记忆可见性范围（社区化场景）
+enum VisibilityScope {
+  VISIBILITY_SCOPE_UNSPECIFIED = 0;
+  OWNER_PRIVATE = 1;    // 仅Owner可见（私密记忆）
+  PUBLIC = 2;           // 公共可见（社区互动/公开设定）
+  VISITOR_PRIVATE = 3;  // 仅该访客可见（可选：访客侧局部记忆）
 }
 
 // 保存记忆请求
@@ -38,6 +49,9 @@ message SaveMemoryRequest {
   int32 importance = 5;  // 1-10
   map<string, string> structured_data = 6;
   repeated float embedding = 7;  // 1536维向量
+  // v1.1 社区化扩展：记忆可见性与写入来源
+  int64 actor_user_id = 8;  // 触发写入的用户（Owner/访客/系统任务）
+  VisibilityScope visibility_scope = 9;
 }
 
 // 保存记忆响应
@@ -54,6 +68,9 @@ message RetrieveMemoriesRequest {
   int32 limit = 5;  // 返回数量(默认5)
   float min_similarity = 6;  // 最小相似度(默认0.7)
   repeated MemoryType types = 7;  // 过滤记忆类型(可选)
+  // v1.1 社区化扩展：按对话发起者身份过滤可见性
+  int64 actor_user_id = 8;
+  repeated VisibilityScope allowed_scopes = 9;  // 允许检索到的范围（由Chat/Policy层决定）
 }
 
 // 检索记忆响应
@@ -128,6 +145,8 @@ message Memory {
   int32 access_count = 8;
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp last_accessed_at = 10;
+  VisibilityScope visibility_scope = 11;
+  int64 actor_user_id = 12;
 }
 
 // 带相似度分数的记忆
@@ -160,4 +179,25 @@ message Relationship {
   int32 interaction_count = 6;
   int32 total_conversation_time = 7;  // 秒
   google.protobuf.Timestamp last_interaction_at = 8;
+  // v1.1 社区化扩展：Owner与权限
+  bool is_owner = 9;
+  string permission_level = 10;  // OWNER / PUBLIC / BLOCKED
+  bool loyalty_lock = 11;
+}
+
+// 上报审计事件请求
+message ReportAuditEventRequest {
+  int64 character_id = 1;
+  int64 owner_user_id = 2;      // 可选：若已知Owner则填充
+  int64 actor_user_id = 3;      // 可选：触发者
+  int64 conversation_id = 4;    // 可选：关联会话
+  string event_type = 5;        // PRIVACY_REQUEST / PROMPT_INJECTION / OWNERSHIP_TRANSFER_ATTEMPT / SEDUCTION / ABUSE
+  string severity = 6;          // LOW / MEDIUM / HIGH / CRITICAL
+  string summary = 7;           // 事件摘要（避免存完整原文）
+  map<string, string> metadata = 8;
+}
+
+message ReportAuditEventResponse {
+  int64 event_id = 1;           // 审计事件ID（雪花ID）
+  bool success = 2;
 }

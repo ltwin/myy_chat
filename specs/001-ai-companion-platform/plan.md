@@ -25,7 +25,10 @@
 
 **Primary Dependencies**:
 - Backend Go: Kratos v2.7+, gRPC, Wire, pgx
-- Backend Python: FastAPI, LangChain, LiteLLM, LangGraph
+- Backend Python: FastAPI, LangChain, LangGraph
+  > **Note**: FastAPI 用于 HTTP 健康检查端点和调试接口；gRPC 用于与其他微服务的通信
+- LLM Gateway: LiteLLM Proxy v1.77+ (Docker 独立部署)
+  > **Note**: 统一 LLM API 入口，内置计费/限流/故障切换，支持 OpenAI、Anthropic、Gemini、Azure、Bedrock 等 100+ 模型
 - Frontend: React 19.2.0, Vite 7.2.4, React Router 7.11.0, Tailwind CSS 3.4.17
 
 **Storage**:
@@ -222,11 +225,11 @@ myy_chat/
 │   └── go.mod                     # Go 模块定义
 │
 ├── backend/python/                   # Python AI 服务
-│   ├── llm-service/               # LLM 调用服务
+│   ├── llm-agent-service/         # Agent 编排服务 (通过 LiteLLM Proxy 调用 LLM)
 │   │   ├── app/
 │   │   │   ├── api/              # gRPC 服务
-│   │   │   ├── core/             # 核心逻辑 (熔断器, LLM 客户端)
-│   │   │   └── services/         # Agent, Tools
+│   │   │   ├── core/             # 核心逻辑 (Agent 编排)
+│   │   │   └── services/         # Agent, Tools, 记忆集成
 │   │   └── tests/
 │   ├── memory-processor/          # 记忆处理服务
 │   │   ├── app/
@@ -238,8 +241,11 @@ myy_chat/
 │
 ├── deployments/                      # 部署配置
 │   ├── docker-compose.dev.yml     # 开发环境
+│   ├── litellm/                   # LiteLLM Proxy 配置
+│   │   └── config.yaml           # 多模型路由/限流/故障切换配置
 │   ├── postgres/                  # PostgreSQL 初始化
 │   └── k8s/                       # Kubernetes Helm charts
+│       └── litellm/              # LiteLLM Proxy K8s 部署
 │
 ├── docs/                             # 项目文档
 │   ├── api/                       # API 文档
