@@ -11,6 +11,7 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
+  etcd_data:
 
 services:
   # ============================================
@@ -30,7 +31,7 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
     networks:
       - myy-chat-network
     healthcheck:
@@ -80,98 +81,372 @@ services:
       retries: 3
 
   # ============================================
-  # Golang 微服务 (占位符,待后续实现)
+  # API Gateway - APISIX
   # ============================================
 
-  # user-service:
-  #   build:
-  #     context: ../backend/golang/user-service
-  #     dockerfile: Dockerfile
-  #   container_name: myy-chat-user-service
-  #   restart: unless-stopped
-  #   environment:
-  #     - DATABASE_URL=postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}
-  #     - REDIS_HOST=redis
-  #     - DATACENTER_ID=${DATACENTER_ID:-1}
-  #     - WORKER_ID=${WORKER_ID:-1}
-  #   ports:
-  #     - "50051:50051"
-  #     - "8051:8051"
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #   networks:
-  #     - myy-chat-network
+  # etcd (APISIX 配置存储)
+  etcd:
+    image: bitnami/etcd:3.5
+    container_name: myy-chat-etcd
+    restart: unless-stopped
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
+      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
+    volumes:
+      - etcd_data:/bitnami/etcd
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # APISIX API Gateway
+  apisix:
+    image: apache/apisix:3.8.0-debian
+    container_name: myy-chat-apisix
+    restart: unless-stopped
+    ports:
+      - "9080:9080"    # HTTP 端口
+      - "9443:9443"    # HTTPS 端口
+      - "9180:9180"    # Admin API 端口
+    volumes:
+      - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+    depends_on:
+      etcd:
+        condition: service_healthy
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9080/apisix/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # APISIX Dashboard (可选，用于可视化管理)
+  apisix-dashboard:
+    image: apache/apisix-dashboard:3.0.1-alpine
+    container_name: myy-chat-apisix-dashboard
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./apisix/dashboard.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
+    depends_on:
+      - apisix
+    networks:
+      - myy-chat-network
+    profiles:
+      - dashboard  # 仅在需要时启动: docker-compose --profile dashboard up
 
   # ============================================
-  # Python 微服务 (占位符,待后续实现)
+  # LiteLLM Proxy (LLM Gateway)
   # ============================================
 
-  # llm-service:
-  #   build:
-  #     context: ../backend/python/llm-service
-  #     dockerfile: Dockerfile
-  #   container_name: myy-chat-llm-service
-  #   restart: unless-stopped
-  #   environment:
-  #     - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
-  #     - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
-  #     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-  #   ports:
-  #     - "50061:50061"
-  #     - "8061:8061"
-  #   networks:
-  #     - myy-chat-network
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: myy-chat-litellm
+    restart: unless-stopped
+    command: --config /app/config.yaml --detailed_debug
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-myy-chat-dev-key}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # LLM Provider Keys (从环境变量注入)
+      AZURE_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_API_BASE: ${AZURE_OPENAI_ENDPOINT:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # ============================================
-  # Frontend (占位符,待后续实现)
+  # Golang 微服务
   # ============================================
 
-  # frontend:
-  #   build:
-  #     context: ../frontend
-  #     dockerfile: Dockerfile
-  #   container_name: myy-chat-frontend
-  #   restart: unless-stopped
-  #   environment:
-  #     - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
-  #   ports:
-  #     - "3000:3000"
-  #   networks:
-  #     - myy-chat-network
+  user-service:
+    build:
+      context: ../backend/golang
+      dockerfile: app/user/Dockerfile
+    container_name: myy-chat-user-service
+    restart: unless-stopped
+    environment:
+      DATABASE_DSN: postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}?sslmode=disable
+      REDIS_ADDR: redis:6379
+      GRPC_PORT: 9000
+      HTTP_PORT: 8000
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      DATACENTER_ID: ${DATACENTER_ID:-1}
+      WORKER_ID: 1
+    ports:
+      - "8001:8000"    # HTTP
+      - "9001:9000"    # gRPC
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  character-service:
+    build:
+      context: ../backend/golang
+      dockerfile: app/character/Dockerfile
+    container_name: myy-chat-character-service
+    restart: unless-stopped
+    environment:
+      DATABASE_DSN: postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}?sslmode=disable
+      REDIS_ADDR: redis:6379
+      GRPC_PORT: 9000
+      HTTP_PORT: 8000
+      DATACENTER_ID: ${DATACENTER_ID:-1}
+      WORKER_ID: 2
+    ports:
+      - "8002:8000"
+      - "9002:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  conversation-service:
+    build:
+      context: ../backend/golang
+      dockerfile: app/conversation/Dockerfile
+    container_name: myy-chat-conversation-service
+    restart: unless-stopped
+    environment:
+      DATABASE_DSN: postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}?sslmode=disable
+      REDIS_ADDR: redis:6379
+      GRPC_PORT: 9000
+      HTTP_PORT: 8000
+      DATACENTER_ID: ${DATACENTER_ID:-1}
+      WORKER_ID: 3
+    ports:
+      - "8003:8000"
+      - "9003:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  memory-service:
+    build:
+      context: ../backend/golang
+      dockerfile: app/memory/Dockerfile
+    container_name: myy-chat-memory-service
+    restart: unless-stopped
+    environment:
+      DATABASE_DSN: postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}?sslmode=disable
+      REDIS_ADDR: redis:6379
+      GRPC_PORT: 9000
+      HTTP_PORT: 8000
+      DATACENTER_ID: ${DATACENTER_ID:-1}
+      WORKER_ID: 4
+    ports:
+      - "8004:8000"
+      - "9004:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  billing-service:
+    build:
+      context: ../backend/golang
+      dockerfile: app/billing/Dockerfile
+    container_name: myy-chat-billing-service
+    restart: unless-stopped
+    environment:
+      DATABASE_DSN: postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}?sslmode=disable
+      REDIS_ADDR: redis:6379
+      GRPC_PORT: 9000
+      HTTP_PORT: 8000
+      LITELLM_URL: http://litellm:4000
+      LITELLM_API_KEY: ${LITELLM_MASTER_KEY:-sk-myy-chat-dev-key}
+      DATACENTER_ID: ${DATACENTER_ID:-1}
+      WORKER_ID: 5
+    ports:
+      - "8005:8000"
+      - "9005:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # ============================================
-  # 可观测性 (可选,用于生产环境)
+  # Python 微服务
   # ============================================
 
-  # prometheus:
-  #   image: prom/prometheus:latest
-  #   container_name: myy-chat-prometheus
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-  #   ports:
-  #     - "9090:9090"
-  #   networks:
-  #     - myy-chat-network
+  llm-agent-service:
+    build:
+      context: ../backend/python/llm-agent-service
+      dockerfile: Dockerfile
+    container_name: myy-chat-llm-agent-service
+    restart: unless-stopped
+    environment:
+      LLM_AGENT_HTTP_PORT: 8000
+      LLM_AGENT_GRPC_PORT: 9000
+      LITELLM_PROXY_URL: http://litellm:4000
+      LITELLM_API_KEY: ${LITELLM_MASTER_KEY:-sk-myy-chat-dev-key}
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}
+    ports:
+      - "8006:8000"
+      - "9006:9000"
+    depends_on:
+      litellm:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
-  # grafana:
-  #   image: grafana/grafana:latest
-  #   container_name: myy-chat-grafana
-  #   restart: unless-stopped
-  #   ports:
-  #     - "3001:3000"
-  #   environment:
-  #     - GF_SECURITY_ADMIN_PASSWORD=admin
-  #   networks:
-  #     - myy-chat-network
+  memory-processor:
+    build:
+      context: ../backend/python/memory-processor
+      dockerfile: Dockerfile
+    container_name: myy-chat-memory-processor
+    restart: unless-stopped
+    environment:
+      MEMORY_PROC_HTTP_PORT: 8000
+      MEMORY_PROC_GRPC_PORT: 9000
+      LITELLM_PROXY_URL: http://litellm:4000
+      LITELLM_API_KEY: ${LITELLM_MASTER_KEY:-sk-myy-chat-dev-key}
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-change_me_in_production}
+    ports:
+      - "8007:8000"
+      - "9007:9000"
+    depends_on:
+      litellm:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - myy-chat-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
-  # jaeger:
-  #   image: jaegertracing/all-in-one:latest
-  #   container_name: myy-chat-jaeger
-  #   restart: unless-stopped
-  #   ports:
-  #     - "16686:16686"  # Jaeger UI
-  #     - "14268:14268"  # Collector HTTP
-  #   networks:
-  #     - myy-chat-network
+  # ============================================
+  # 可观测性 (可选)
+  # ============================================
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.53
+    container_name: myy-chat-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    networks:
+      - myy-chat-network
+    profiles:
+      - observability
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: myy-chat-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - myy-chat-network
+    profiles:
+      - observability
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: myy-chat-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - myy-chat-network
+    profiles:
+      - observability

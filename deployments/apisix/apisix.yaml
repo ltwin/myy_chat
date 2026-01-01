@@ -1,0 +1,422 @@
+# APISIX 路由和上游配置 (Standalone 模式)
+# 文档: https://apisix.apache.org/docs/apisix/stand-alone/
+
+# ============================================
+# 上游服务定义
+# ============================================
+upstreams:
+  # 用户服务
+  - id: user-service
+    type: roundrobin
+    nodes:
+      "user-service:8000": 1
+    timeout:
+      connect: 3
+      send: 10
+      read: 10
+    retries: 2
+    checks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 3
+          http_failures: 3
+
+  # 角色服务
+  - id: character-service
+    type: roundrobin
+    nodes:
+      "character-service:8000": 1
+    timeout:
+      connect: 3
+      send: 10
+      read: 10
+    retries: 2
+    checks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 3
+          http_failures: 3
+
+  # 对话服务
+  - id: conversation-service
+    type: roundrobin
+    nodes:
+      "conversation-service:8000": 1
+    timeout:
+      connect: 3
+      send: 30
+      read: 30
+    retries: 2
+    checks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 3
+          http_failures: 3
+
+  # 记忆服务
+  - id: memory-service
+    type: roundrobin
+    nodes:
+      "memory-service:8000": 1
+    timeout:
+      connect: 3
+      send: 10
+      read: 10
+    retries: 2
+    checks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 3
+          http_failures: 3
+
+  # 计费服务
+  - id: billing-service
+    type: roundrobin
+    nodes:
+      "billing-service:8000": 1
+    timeout:
+      connect: 3
+      send: 10
+      read: 10
+    retries: 2
+    checks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 3
+          http_failures: 3
+
+  # LLM Agent 服务
+  - id: llm-agent-service
+    type: roundrobin
+    nodes:
+      "llm-agent-service:8000": 1
+    timeout:
+      connect: 3
+      send: 60
+      read: 60
+    retries: 1
+    checks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 3
+          http_failures: 3
+
+# ============================================
+# 全局插件规则
+# ============================================
+global_rules:
+  - id: 1
+    plugins:
+      # CORS 跨域配置
+      cors:
+        allow_origins: "*"
+        allow_methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        allow_headers: "Content-Type, Authorization, X-Request-ID"
+        expose_headers: "X-Request-ID"
+        max_age: 3600
+        allow_credential: true
+
+      # 请求 ID
+      request-id:
+        header_name: X-Request-ID
+        include_in_response: true
+
+      # Prometheus 监控
+      prometheus: {}
+
+# ============================================
+# 路由定义
+# ============================================
+routes:
+  # ------------------------------------------
+  # 公开路由 (无需认证)
+  # ------------------------------------------
+
+  # 健康检查
+  - id: health-check
+    uri: /health
+    methods: ["GET"]
+    upstream_id: user-service
+    plugins:
+      limit-req:
+        rate: 100
+        burst: 50
+        key_type: var
+        key: remote_addr
+
+  # 用户注册
+  - id: user-register
+    uri: /api/v1/users/register
+    methods: ["POST"]
+    upstream_id: user-service
+    plugins:
+      limit-req:
+        rate: 10
+        burst: 5
+        key_type: var
+        key: remote_addr
+
+  # 用户登录
+  - id: user-login
+    uri: /api/v1/users/login
+    methods: ["POST"]
+    upstream_id: user-service
+    plugins:
+      limit-req:
+        rate: 20
+        burst: 10
+        key_type: var
+        key: remote_addr
+
+  # 刷新 Token
+  - id: user-refresh-token
+    uri: /api/v1/users/refresh
+    methods: ["POST"]
+    upstream_id: user-service
+    plugins:
+      limit-req:
+        rate: 30
+        burst: 15
+        key_type: var
+        key: remote_addr
+
+  # 公开角色列表
+  - id: public-characters
+    uri: /api/v1/characters/public
+    methods: ["GET"]
+    upstream_id: character-service
+    plugins:
+      limit-req:
+        rate: 60
+        burst: 30
+        key_type: var
+        key: remote_addr
+
+  # ------------------------------------------
+  # 需要认证的路由
+  # ------------------------------------------
+
+  # 用户服务 - 需要认证
+  - id: user-service-protected
+    uri: /api/v1/users/*
+    methods: ["GET", "PUT", "DELETE", "PATCH"]
+    upstream_id: user-service
+    plugins:
+      jwt-auth:
+        header: Authorization
+        query: token
+        cookie: jwt
+      limit-req:
+        rate: 60
+        burst: 30
+        key_type: var
+        key: consumer_name
+      api-breaker:
+        break_response_code: 503
+        max_breaker_sec: 30
+        unhealthy:
+          http_statuses: [500, 502, 503, 504]
+          failures: 3
+        healthy:
+          successes: 1
+
+  # 角色服务 - 需要认证
+  - id: character-service-protected
+    uri: /api/v1/characters/*
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    upstream_id: character-service
+    plugins:
+      jwt-auth:
+        header: Authorization
+        query: token
+        cookie: jwt
+      limit-req:
+        rate: 60
+        burst: 30
+        key_type: var
+        key: consumer_name
+      api-breaker:
+        break_response_code: 503
+        max_breaker_sec: 30
+        unhealthy:
+          http_statuses: [500, 502, 503, 504]
+          failures: 3
+        healthy:
+          successes: 1
+
+  # 对话服务 - 需要认证
+  - id: conversation-service-protected
+    uri: /api/v1/conversations/*
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    upstream_id: conversation-service
+    plugins:
+      jwt-auth:
+        header: Authorization
+        query: token
+        cookie: jwt
+      limit-req:
+        rate: 30
+        burst: 15
+        key_type: var
+        key: consumer_name
+      api-breaker:
+        break_response_code: 503
+        max_breaker_sec: 30
+        unhealthy:
+          http_statuses: [500, 502, 503, 504]
+          failures: 3
+        healthy:
+          successes: 1
+
+  # 消息服务 - 需要认证 (较低限流，因为涉及 LLM 调用)
+  - id: message-service-protected
+    uri: /api/v1/messages/*
+    methods: ["GET", "POST"]
+    upstream_id: conversation-service
+    plugins:
+      jwt-auth:
+        header: Authorization
+        query: token
+        cookie: jwt
+      limit-req:
+        rate: 10
+        burst: 5
+        key_type: var
+        key: consumer_name
+      api-breaker:
+        break_response_code: 503
+        max_breaker_sec: 60
+        unhealthy:
+          http_statuses: [500, 502, 503, 504]
+          failures: 3
+        healthy:
+          successes: 1
+
+  # 记忆服务 - 需要认证
+  - id: memory-service-protected
+    uri: /api/v1/memories/*
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    upstream_id: memory-service
+    plugins:
+      jwt-auth:
+        header: Authorization
+        query: token
+        cookie: jwt
+      limit-req:
+        rate: 30
+        burst: 15
+        key_type: var
+        key: consumer_name
+      api-breaker:
+        break_response_code: 503
+        max_breaker_sec: 30
+        unhealthy:
+          http_statuses: [500, 502, 503, 504]
+          failures: 3
+        healthy:
+          successes: 1
+
+  # 计费服务 - 需要认证
+  - id: billing-service-protected
+    uri: /api/v1/billing/*
+    methods: ["GET", "POST"]
+    upstream_id: billing-service
+    plugins:
+      jwt-auth:
+        header: Authorization
+        query: token
+        cookie: jwt
+      limit-req:
+        rate: 30
+        burst: 15
+        key_type: var
+        key: consumer_name
+      api-breaker:
+        break_response_code: 503
+        max_breaker_sec: 30
+        unhealthy:
+          http_statuses: [500, 502, 503, 504]
+          failures: 3
+        healthy:
+          successes: 1
+
+  # 积分套餐 - 公开 (但限流)
+  - id: credit-packages-public
+    uri: /api/v1/billing/packages
+    methods: ["GET"]
+    upstream_id: billing-service
+    plugins:
+      limit-req:
+        rate: 60
+        burst: 30
+        key_type: var
+        key: remote_addr
+
+  # 聊天流式接口 - 需要认证 (SSE)
+  - id: chat-stream
+    uri: /api/v1/chat/stream
+    methods: ["POST"]
+    upstream_id: llm-agent-service
+    plugins:
+      jwt-auth:
+        header: Authorization
+        query: token
+        cookie: jwt
+      limit-req:
+        rate: 5
+        burst: 2
+        key_type: var
+        key: consumer_name
+      api-breaker:
+        break_response_code: 503
+        max_breaker_sec: 60
+        unhealthy:
+          http_statuses: [500, 502, 503, 504]
+          failures: 3
+        healthy:
+          successes: 1
+
+# ============================================
+# JWT 消费者配置 (示例)
+# ============================================
+consumers:
+  - username: test-user
+    plugins:
+      jwt-auth:
+        key: test-user-key
+        secret: myy-chat-jwt-secret-key-for-testing
+        algorithm: HS256
+        exp: 86400
+        base64_secret: false
+
+#END

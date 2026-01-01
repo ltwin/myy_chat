@@ -1,0 +1,38 @@
+# APISIX Dashboard 配置
+# 文档: https://apisix.apache.org/docs/dashboard/USER_GUIDE/
+
+conf:
+  listen:
+    host: 0.0.0.0
+    port: 9000
+  etcd:
+    endpoints:
+      - "http://etcd:2379"
+    prefix: "/apisix"
+  log:
+    error_log:
+      level: warn
+      file_path: logs/error.log
+    access_log:
+      file_path: logs/access.log
+
+authentication:
+  secret: myy-chat-dashboard-secret
+  expire_time: 3600
+  users:
+    - username: admin
+      password: admin123
+
+plugins:
+  - api-breaker
+  - cors
+  - jwt-auth
+  - key-auth
+  - limit-conn
+  - limit-count
+  - limit-req
+  - opentelemetry
+  - prometheus
+  - proxy-rewrite
+  - request-id
+  - response-rewrite

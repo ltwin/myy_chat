@@ -69,6 +69,70 @@ service AdminService {
       get: "/health"
     };
   }
+
+  // ============================================
+  // 积分管理接口 (T231)
+  // ============================================
+
+  // GetCreditFormula 获取积分转换公式配置
+  rpc GetCreditFormula(GetCreditFormulaRequest) returns (GetCreditFormulaResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/admin/billing/formula"
+    };
+  }
+
+  // UpdateCreditFormula 更新积分转换公式
+  rpc UpdateCreditFormula(UpdateCreditFormulaRequest) returns (UpdateCreditFormulaResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/admin/billing/formula"
+      body: "*"
+    };
+  }
+
+  // ListAdminCreditPackages 获取积分套餐列表 (管理视角)
+  rpc ListAdminCreditPackages(ListAdminCreditPackagesRequest) returns (ListAdminCreditPackagesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/admin/billing/packages"
+    };
+  }
+
+  // CreateCreditPackage 创建积分套餐
+  rpc CreateCreditPackage(CreateCreditPackageRequest) returns (CreateCreditPackageResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/admin/billing/packages"
+      body: "*"
+    };
+  }
+
+  // UpdateCreditPackage 更新积分套餐
+  rpc UpdateCreditPackage(UpdateCreditPackageRequest) returns (UpdateCreditPackageResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/admin/billing/packages/{package_id}"
+      body: "*"
+    };
+  }
+
+  // DeleteCreditPackage 删除积分套餐
+  rpc DeleteCreditPackage(DeleteCreditPackageRequest) returns (DeleteCreditPackageResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/admin/billing/packages/{package_id}"
+    };
+  }
+
+  // AdjustUserCredits 调整用户积分 (管理员手动操作)
+  rpc AdjustUserCredits(AdjustUserCreditsRequest) returns (AdjustUserCreditsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/admin/users/{user_id}/credits"
+      body: "*"
+    };
+  }
+
+  // GetBillingStats 获取计费统计
+  rpc GetBillingStats(GetBillingStatsRequest) returns (GetBillingStatsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/admin/billing/stats"
+    };
+  }
 }
 
 // ListUsersRequest 获取用户列表请求
@@ -207,4 +271,146 @@ message DailyStat {
   int64 active_users = 3;   // 活跃用户
   int64 messages = 4;       // 消息数
   int64 tokens_used = 5;    // Token消耗
+}
+
+// ============================================
+// 积分管理消息定义 (T231)
+// ============================================
+
+// GetCreditFormula
+
+message GetCreditFormulaRequest {}
+
+message GetCreditFormulaResponse {
+  CreditFormula formula = 1;
+}
+
+message CreditFormula {
+  double base_rate = 1;                       // 基础转换率: 1 USD = X 积分
+  string currency = 2;                        // 货币单位 (USD)
+  map<string, double> model_multipliers = 3;  // 模型成本倍率
+  double platform_margin = 4;                 // 平台利润率
+  string updated_by = 5;                      // 最后更新者
+  google.protobuf.Timestamp updated_at = 6;   // 更新时间
+}
+
+// UpdateCreditFormula
+
+message UpdateCreditFormulaRequest {
+  double base_rate = 1;                       // 基础转换率
+  map<string, double> model_multipliers = 2;  // 模型成本倍率
+  double platform_margin = 3;                 // 平台利润率
+}
+
+message UpdateCreditFormulaResponse {
+  bool success = 1;
+  CreditFormula formula = 2;
+}
+
+// ListAdminCreditPackages
+
+message ListAdminCreditPackagesRequest {
+  bool include_inactive = 1;  // 包含下架套餐
+}
+
+message ListAdminCreditPackagesResponse {
+  repeated AdminCreditPackage packages = 1;
+}
+
+message AdminCreditPackage {
+  int64 id = 1;
+  string name = 2;
+  string description = 3;
+  double credits = 4;
+  double price_cny = 5;
+  double bonus_credits = 6;
+  bool is_active = 7;
+  int32 sort_order = 8;
+  int64 purchase_count = 9;                   // 购买次数统计
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+// CreateCreditPackage
+
+message CreateCreditPackageRequest {
+  string name = 1;
+  string description = 2;
+  double credits = 3;
+  double price_cny = 4;
+  double bonus_credits = 5;
+  int32 sort_order = 6;
+}
+
+message CreateCreditPackageResponse {
+  bool success = 1;
+  AdminCreditPackage package = 2;
+}
+
+// UpdateCreditPackage
+
+message UpdateCreditPackageRequest {
+  int64 package_id = 1;
+  string name = 2;
+  string description = 3;
+  double credits = 4;
+  double price_cny = 5;
+  double bonus_credits = 6;
+  bool is_active = 7;
+  int32 sort_order = 8;
+}
+
+message UpdateCreditPackageResponse {
+  bool success = 1;
+  AdminCreditPackage package = 2;
+}
+
+// DeleteCreditPackage
+
+message DeleteCreditPackageRequest {
+  int64 package_id = 1;
+}
+
+message DeleteCreditPackageResponse {
+  bool success = 1;
+}
+
+// AdjustUserCredits
+
+message AdjustUserCreditsRequest {
+  int64 user_id = 1;
+  double amount = 2;          // 正数为增加，负数为减少
+  string reason = 3;          // 调整原因
+}
+
+message AdjustUserCreditsResponse {
+  bool success = 1;
+  double balance_after = 2;   // 调整后余额
+}
+
+// GetBillingStats
+
+message GetBillingStatsRequest {
+  string period = 1;          // day, week, month
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+}
+
+message GetBillingStatsResponse {
+  double total_revenue = 1;           // 总收入 (CNY)
+  double total_credits_sold = 2;      // 总售出积分
+  double total_credits_consumed = 3;  // 总消耗积分
+  int64 total_orders = 4;             // 总订单数
+  int64 paying_users = 5;             // 付费用户数
+  double avg_order_amount = 6;        // 平均订单金额
+  repeated BillingDailyStat daily_stats = 7;
+}
+
+message BillingDailyStat {
+  string date = 1;
+  double revenue = 2;
+  double credits_sold = 3;
+  double credits_consumed = 4;
+  int64 orders = 5;
+  int64 new_paying_users = 6;
 }

@@ -1,0 +1,94 @@
+# APISIX 主配置文件
+# 文档: https://apisix.apache.org/docs/apisix/admin-api/
+
+apisix:
+  node_listen: 9080
+  enable_ipv6: false
+  enable_admin: true
+  admin_listen:
+    ip: 0.0.0.0
+    port: 9180
+
+  # 启用数据面独立模式 (使用 apisix.yaml 文件配置路由)
+  config_center: yaml
+
+  # SSL 配置
+  ssl:
+    enable: false
+    listen:
+      - port: 9443
+        enable_http2: true
+
+deployment:
+  role: traditional
+  role_traditional:
+    config_provider: etcd
+  admin:
+    admin_key:
+      - name: admin
+        key: myy-chat-admin-key
+        role: admin
+      - name: viewer
+        key: myy-chat-viewer-key
+        role: viewer
+
+etcd:
+  host:
+    - "http://etcd:2379"
+  prefix: "/apisix"
+  timeout: 30
+
+# 插件配置
+plugins:
+  - jwt-auth
+  - key-auth
+  - basic-auth
+  - limit-req
+  - limit-count
+  - limit-conn
+  - cors
+  - prometheus
+  - opentelemetry
+  - api-breaker
+  - request-id
+  - response-rewrite
+  - proxy-rewrite
+  - grpc-transcode
+  - grpc-web
+
+# 全局插件配置
+plugin_attr:
+  prometheus:
+    export_uri: /apisix/prometheus/metrics
+    export_addr:
+      ip: 0.0.0.0
+      port: 9091
+    metric_prefix: apisix_
+
+  opentelemetry:
+    trace_id_source: x-request-id
+    resource:
+      service.name: myy-chat-apisix
+    collector:
+      address: jaeger:4317
+      request_timeout: 3
+    batch_span_processor:
+      drop_on_queue_full: false
+      max_queue_size: 1024
+      batch_timeout: 2
+      inactive_timeout: 1
+      max_export_batch_size: 16
+
+  log-rotate:
+    interval: 3600
+    max_kept: 168
+    enable_compression: true
+
+# 日志配置
+nginx_config:
+  error_log: logs/error.log
+  error_log_level: warn
+  http:
+    access_log: logs/access.log
+    access_log_format: |
+      {"time": "$time_iso8601", "remote_addr": "$remote_addr", "request": "$request", "status": $status, "body_bytes_sent": $body_bytes_sent, "request_time": $request_time, "upstream_response_time": "$upstream_response_time"}

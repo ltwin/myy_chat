@@ -1,0 +1,65 @@
+# Prometheus 配置
+# MyY Chat AI 角色对话平台
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # APISIX 指标
+  - job_name: 'apisix'
+    static_configs:
+      - targets: ['apisix:9091']
+
+  # Go 微服务
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:8000']
+    metrics_path: /metrics
+
+  - job_name: 'character-service'
+    static_configs:
+      - targets: ['character-service:8000']
+    metrics_path: /metrics
+
+  - job_name: 'conversation-service'
+    static_configs:
+      - targets: ['conversation-service:8000']
+    metrics_path: /metrics
+
+  - job_name: 'memory-service'
+    static_configs:
+      - targets: ['memory-service:8000']
+    metrics_path: /metrics
+
+  - job_name: 'billing-service'
+    static_configs:
+      - targets: ['billing-service:8000']
+    metrics_path: /metrics
+
+  # Python 微服务
+  - job_name: 'llm-agent-service'
+    static_configs:
+      - targets: ['llm-agent-service:8000']
+    metrics_path: /metrics
+
+  - job_name: 'memory-processor'
+    static_configs:
+      - targets: ['memory-processor:8000']
+    metrics_path: /metrics
+
+  # LiteLLM Proxy
+  - job_name: 'litellm'
+    static_configs:
+      - targets: ['litellm:4000']
+    metrics_path: /metrics
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+
+  # PostgreSQL (需要 postgres_exporter)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
