@@ -3,6 +3,8 @@ package biz
 import (
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestNewUser(t *testing.T) {
@@ -224,6 +226,27 @@ func TestUser_CanLogin(t *testing.T) {
 	if err := user.CanLogin(); err != ErrUserDeleted {
 		t.Errorf("deleted user should not be able to login, got error: %v", err)
 	}
+
+	// 处于删除冷静期仍可登录，以便用户取消删除
+	pendingUser, _ := NewUser(2, "pendinguser", "pending@example.com", "password123")
+	pendingUser.ScheduleDeletion()
+	if err := pendingUser.CanLogin(); err != nil {
+		t.Errorf("deletion-scheduled user should still be able to login, got: %v", err)
+	}
+}
+
+func TestHashPassword_UsesBcryptCost12(t *testing.T) {
+	hash, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("hash password failed: %v", err)
+	}
+	cost, err := bcrypt.Cost([]byte(hash))
+	if err != nil {
+		t.Fatalf("parse bcrypt cost failed: %v", err)
+	}
+	if cost != 12 {
+		t.Fatalf("unexpected bcrypt cost: got %d want 12", cost)
+	}
 }
 
 func TestValidateEmail(t *testing.T) {
@@ -255,12 +278,12 @@ func TestValidateUsername(t *testing.T) {
 		username string
 		wantErr  bool
 	}{
-		{"abc", false},             // 最小长度
-		{"testuser", false},        // 正常长度
-		{"用户名", false},             // 中文 (3个字符)
-		{"ab", true},               // 太短
-		{"a", true},                // 太短
-		{"", true},                 // 空
+		{"abc", false},                   // 最小长度
+		{"testuser", false},              // 正常长度
+		{"用户名", false},                   // 中文 (3个字符)
+		{"ab", true},                     // 太短
+		{"a", true},                      // 太短
+		{"", true},                       // 空
 		{string(make([]byte, 51)), true}, // 太长
 	}
 
@@ -279,10 +302,10 @@ func TestValidatePassword(t *testing.T) {
 		password string
 		wantErr  bool
 	}{
-		{"12345678", false},   // 最小长度
+		{"12345678", false}, // 最小长度
 		{"password123", false},
-		{"1234567", true},     // 太短
-		{"", true},            // 空
+		{"1234567", true},                 // 太短
+		{"", true},                        // 空
 		{string(make([]byte, 129)), true}, // 太长
 	}
 

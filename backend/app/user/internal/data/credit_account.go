@@ -104,7 +104,7 @@ func (r *creditAccountRepo) Update(ctx context.Context, account *biz.CreditAccou
 }
 
 // AddCredits 增加积分 (带交易记录)
-func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount float64, reason, refType string, refID int64) error {
+func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount int64, reason, refType string, refID int64) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -112,7 +112,7 @@ func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount
 	defer tx.Rollback(ctx)
 
 	// 更新账户余额
-	var balanceAfter float64
+	var balanceAfter int64
 	updateQuery := `
 		UPDATE credit_accounts
 		SET balance = balance + $2, total_charged = total_charged + $2, updated_at = NOW()
@@ -151,7 +151,7 @@ func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount
 }
 
 // DeductCredits 扣除积分 (带交易记录)
-func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amount float64, reason, refType string, refID int64, idempotencyKey string) error {
+func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amount int64, reason, refType string, refID int64, idempotencyKey string) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -172,7 +172,7 @@ func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amo
 	}
 
 	// 检查余额并更新
-	var balanceAfter float64
+	var balanceAfter int64
 	updateQuery := `
 		UPDATE credit_accounts
 		SET balance = balance - $2, total_consumed = total_consumed + $2, updated_at = NOW()
@@ -183,7 +183,7 @@ func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amo
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// 可能是余额不足或账户不存在
-			var currentBalance float64
+			var currentBalance int64
 			checkBalanceQuery := `SELECT balance FROM credit_accounts WHERE user_id = $1`
 			checkErr := tx.QueryRow(ctx, checkBalanceQuery, userID).Scan(&currentBalance)
 			if checkErr != nil {

@@ -15,6 +15,8 @@ func NewGRPCServer(c *conf.Server, userSvc *service.UserService, logger log.Logg
 	var opts = []grpc.ServerOption{
 		grpc.Middleware(
 			recovery.Recovery(),
+			loginLockoutSelectorMiddleware(logger),
+			jwtSelectorMiddleware(logger),
 		),
 	}
 	if c.Grpc.Network != "" {

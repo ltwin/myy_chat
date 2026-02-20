@@ -86,7 +86,7 @@ func (r *sessionRepo) scanSession(row pgx.Row) (*biz.Session, error) {
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, biz.ErrSessionExpired
+			return nil, biz.ErrSessionNotFound
 		}
 		return nil, err
 	}
@@ -108,12 +108,14 @@ func (r *sessionRepo) scanSession(row pgx.Row) (*biz.Session, error) {
 func (r *sessionRepo) Update(ctx context.Context, session *biz.Session) error {
 	query := `
 		UPDATE sessions SET
-			expires_at = $2,
-			revoked_at = $3
+			refresh_token_hash = $2,
+			expires_at = $3,
+			revoked_at = $4
 		WHERE id = $1
 	`
 	_, err := r.db.Exec(ctx, query,
 		session.ID,
+		session.RefreshTokenHash,
 		session.ExpiresAt,
 		nullTime(session.RevokedAt),
 	)

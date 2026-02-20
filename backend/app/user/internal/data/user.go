@@ -4,12 +4,14 @@ package data
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lib/pq"
 
 	"github.com/myy-chat/backend/app/user/internal/biz"
 )
@@ -38,7 +40,7 @@ func (r *userRepo) Create(ctx context.Context, user *biz.User) error {
 	_, err := r.db.Exec(ctx, query,
 		user.ID,
 		user.Username,
-		user.Email,
+		biz.NormalizeEmail(user.Email),
 		user.PasswordHash,
 		nullString(user.Phone),
 		nullString(user.AvatarURL),
@@ -50,6 +52,83 @@ func (r *userRepo) Create(ctx context.Context, user *biz.User) error {
 		nullTime(user.DeletionScheduledAt),
 	)
 	return err
+}
+
+// CreateWithInitialResources 在单事务中创建用户、用户画像和初始积分账户
+func (r *userRepo) CreateWithInitialResources(ctx context.Context, user *biz.User, profile *biz.UserProfile, initialCredits int64) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	createUserSQL := `
+		INSERT INTO users (id, username, email, password_hash, phone, avatar_url,
+			email_verified, created_at, updated_at, last_login_at, is_deleted, deletion_scheduled_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	`
+	if _, err := tx.Exec(ctx, createUserSQL,
+		user.ID,
+		user.Username,
+		biz.NormalizeEmail(user.Email),
+		user.PasswordHash,
+		nullString(user.Phone),
+		nullString(user.AvatarURL),
+		user.EmailVerified,
+		user.CreatedAt,
+		user.UpdatedAt,
+		nullTime(user.LastLoginAt),
+		user.IsDeleted,
+		nullTime(user.DeletionScheduledAt),
+	); err != nil {
+		return err
+	}
+
+	createProfileSQL := `
+		INSERT INTO user_profiles (user_id, full_name, gender, birth_date, location, interests, occupation, bio, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`
+
+	locationJSON, err := json.Marshal(profile.Location)
+	if err != nil {
+		return err
+	}
+	var birthDate sql.NullTime
+	if profile.BirthDate != nil {
+		birthDate = sql.NullTime{Time: *profile.BirthDate.ToTime(), Valid: true}
+	}
+
+	if _, err := tx.Exec(ctx, createProfileSQL,
+		profile.UserID,
+		nullString(profile.FullName),
+		nullString(profile.Gender),
+		birthDate,
+		locationJSON,
+		pq.Array(profile.Interests),
+		nullString(profile.Occupation),
+		nullString(profile.Bio),
+		profile.CreatedAt,
+		profile.UpdatedAt,
+	); err != nil {
+		return err
+	}
+
+	createCreditSQL := `
+		INSERT INTO credit_accounts (user_id, balance, total_charged, total_consumed, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
+	if _, err := tx.Exec(ctx, createCreditSQL,
+		user.ID,
+		initialCredits,
+		initialCredits,
+		0,
+		user.CreatedAt,
+		user.UpdatedAt,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 // GetByID 根据ID获取用户
@@ -69,9 +148,9 @@ func (r *userRepo) GetByEmail(ctx context.Context, email string) (*biz.User, err
 		SELECT id, username, email, password_hash, phone, avatar_url,
 			email_verified, created_at, updated_at, last_login_at, is_deleted, deletion_scheduled_at
 		FROM users
-		WHERE email = $1 AND NOT is_deleted
+		WHERE lower(email) = lower($1) AND NOT is_deleted
 	`
-	return r.scanUser(r.db.QueryRow(ctx, query, email))
+	return r.scanUser(r.db.QueryRow(ctx, query, biz.NormalizeEmail(email)))
 }
 
 // GetByUsername 根据用户名获取用户
@@ -159,7 +238,7 @@ func (r *userRepo) Update(ctx context.Context, user *biz.User) error {
 	result, err := r.db.Exec(ctx, query,
 		user.ID,
 		user.Username,
-		user.Email,
+		biz.NormalizeEmail(user.Email),
 		user.PasswordHash,
 		nullString(user.Phone),
 		nullString(user.AvatarURL),
@@ -197,9 +276,9 @@ func (r *userRepo) Delete(ctx context.Context, id int64) error {
 
 // ExistsByEmail 检查邮箱是否存在
 func (r *userRepo) ExistsByEmail(ctx context.Context, email string) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND NOT is_deleted)`
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email) = lower($1) AND NOT is_deleted)`
 	var exists bool
-	err := r.db.QueryRow(ctx, query, email).Scan(&exists)
+	err := r.db.QueryRow(ctx, query, biz.NormalizeEmail(email)).Scan(&exists)
 	return exists, err
 }
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -13,27 +14,30 @@ import (
 
 // 用户相关错误定义
 var (
-	ErrUserNotFound           = errors.New("user not found")
-	ErrUserAlreadyExists      = errors.New("user already exists")
-	ErrEmailAlreadyExists     = errors.New("email already exists")
-	ErrUsernameAlreadyExists  = errors.New("username already exists")
-	ErrPhoneAlreadyExists     = errors.New("phone already exists")
-	ErrInvalidCredentials     = errors.New("invalid credentials")
-	ErrUserDeleted            = errors.New("user has been deleted")
-	ErrUserDeletionPending    = errors.New("user deletion is pending")
-	ErrInvalidEmail           = errors.New("invalid email format")
-	ErrInvalidUsername        = errors.New("invalid username: must be 3-50 characters")
-	ErrInvalidPassword        = errors.New("invalid password: must be 8-128 characters")
-	ErrPasswordMismatch       = errors.New("current password is incorrect")
-	ErrEmailNotVerified       = errors.New("email not verified")
-	ErrAccountLocked          = errors.New("account is locked due to too many failed attempts")
-	ErrSessionExpired         = errors.New("session expired")
-	ErrSessionRevoked         = errors.New("session has been revoked")
-	ErrInvalidRefreshToken    = errors.New("invalid refresh token")
+	ErrUserNotFound          = errors.New("user not found")
+	ErrUserAlreadyExists     = errors.New("user already exists")
+	ErrEmailAlreadyExists    = errors.New("email already exists")
+	ErrUsernameAlreadyExists = errors.New("username already exists")
+	ErrPhoneAlreadyExists    = errors.New("phone already exists")
+	ErrInvalidCredentials    = errors.New("invalid credentials")
+	ErrUserDeleted           = errors.New("user has been deleted")
+	ErrUserDeletionPending   = errors.New("user deletion is pending")
+	ErrInvalidEmail          = errors.New("invalid email format")
+	ErrInvalidUsername       = errors.New("invalid username: must be 3-50 characters")
+	ErrInvalidPassword       = errors.New("invalid password: must be 8-128 characters")
+	ErrPasswordMismatch      = errors.New("current password is incorrect")
+	ErrEmailNotVerified      = errors.New("email not verified")
+	ErrAccountLocked         = errors.New("account is locked due to too many failed attempts")
+	ErrSessionExpired        = errors.New("session expired")
+	ErrSessionNotFound       = errors.New("session not found")
+	ErrSessionRevoked        = errors.New("session has been revoked")
+	ErrInvalidRefreshToken   = errors.New("invalid refresh token")
 )
 
 // emailRegex 邮箱格式验证正则
 var emailRegex = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
+
+const passwordHashCost = 12
 
 // User 用户实体
 type User struct {
@@ -53,13 +57,15 @@ type User struct {
 
 // NewUser 创建新用户
 func NewUser(id int64, username, email, password string) (*User, error) {
+	normalizedEmail := NormalizeEmail(email)
+
 	// 验证用户名
 	if err := ValidateUsername(username); err != nil {
 		return nil, err
 	}
 
 	// 验证邮箱
-	if err := ValidateEmail(email); err != nil {
+	if err := ValidateEmail(normalizedEmail); err != nil {
 		return nil, err
 	}
 
@@ -78,7 +84,7 @@ func NewUser(id int64, username, email, password string) (*User, error) {
 	return &User{
 		ID:            id,
 		Username:      username,
-		Email:         email,
+		Email:         normalizedEmail,
 		PasswordHash:  hash,
 		EmailVerified: false,
 		CreatedAt:     now,
@@ -97,10 +103,15 @@ func ValidateUsername(username string) error {
 
 // ValidateEmail 验证邮箱格式
 func ValidateEmail(email string) error {
-	if !emailRegex.MatchString(email) {
+	if !emailRegex.MatchString(NormalizeEmail(email)) {
 		return ErrInvalidEmail
 	}
 	return nil
+}
+
+// NormalizeEmail 归一化邮箱为 lower-case
+func NormalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
 }
 
 // ValidatePassword 验证密码强度
@@ -114,7 +125,7 @@ func ValidatePassword(password string) error {
 
 // HashPassword 生成密码哈希
 func HashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordHashCost)
 	if err != nil {
 		return "", err
 	}
@@ -207,6 +218,8 @@ func (u *User) MarkDeleted() {
 
 // CanLogin 检查用户是否可以登录
 func (u *User) CanLogin() error {
+	// 设计约定：处于删除冷静期（DeletionScheduledAt != nil）的账号仍允许登录，
+	// 以便用户在 30 天内执行取消删除。
 	if u.IsDeleted {
 		return ErrUserDeleted
 	}
@@ -222,6 +235,8 @@ func (u *User) IsDeletionScheduled() bool {
 type UserRepo interface {
 	// Create 创建用户
 	Create(ctx context.Context, user *User) error
+	// CreateWithInitialResources 在单事务内创建用户、用户画像与初始积分账户
+	CreateWithInitialResources(ctx context.Context, user *User, profile *UserProfile, initialCredits int64) error
 	// GetByID 根据ID获取用户
 	GetByID(ctx context.Context, id int64) (*User, error)
 	// GetByEmail 根据邮箱获取用户

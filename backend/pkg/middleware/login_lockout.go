@@ -4,6 +4,8 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"net"
+	"strings"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/errors"
@@ -16,11 +18,11 @@ import (
 
 // LoginLockoutConfig 登录锁定配置
 type LoginLockoutConfig struct {
-	MaxAttempts   int           // 最大尝试次数，默认5次
-	LockDuration  time.Duration // 锁定时长，默认15分钟
-	WindowSize    time.Duration // 计数窗口，默认15分钟
-	RedisClient   *redis.Client // Redis 客户端
-	KeyPrefix     string        // Redis key 前缀
+	MaxAttempts  int           // 最大尝试次数，默认5次
+	LockDuration time.Duration // 锁定时长，默认15分钟
+	WindowSize   time.Duration // 计数窗口，默认15分钟
+	RedisClient  *redis.Client // Redis 客户端
+	KeyPrefix    string        // Redis key 前缀
 }
 
 // DefaultLoginLockoutConfig 默认配置
@@ -204,17 +206,27 @@ func (l *LoginLockout) Middleware() middleware.Middleware {
 func (l *LoginLockout) getIdentifier(ctx context.Context, req interface{}) string {
 	// 尝试从请求中获取邮箱
 	if loginReq, ok := req.(interface{ GetEmail() string }); ok {
-		return loginReq.GetEmail()
+		if principal := strings.ToLower(strings.TrimSpace(loginReq.GetEmail())); principal != "" {
+			return "principal:" + principal
+		}
 	}
 
 	// 回退到 IP 地址
 	if tr, ok := transport.FromServerContext(ctx); ok {
 		if httpTr, ok := tr.(*http.Transport); ok {
-			return httpTr.Request().RemoteAddr
+			return "ip:" + normalizeRemoteAddr(httpTr.Request().RemoteAddr)
 		}
 	}
 
 	return ""
+}
+
+func normalizeRemoteAddr(remoteAddr string) string {
+	normalized := strings.TrimSpace(remoteAddr)
+	if host, _, err := net.SplitHostPort(normalized); err == nil {
+		return host
+	}
+	return normalized
 }
 
 // ErrAccountLocked 账户锁定错误

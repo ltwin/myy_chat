@@ -3,6 +3,7 @@ package biz
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -58,6 +59,8 @@ type RegisterOutput struct {
 // Register 用户注册 (FR-001)
 // 创建用户、用户画像、积分账户，并发放初始积分
 func (s *UserService) Register(ctx context.Context, input RegisterInput) (*RegisterOutput, error) {
+	input.Email = NormalizeEmail(input.Email)
+
 	// 检查邮箱是否已存在
 	exists, err := s.userRepo.ExistsByEmail(ctx, input.Email)
 	if err != nil {
@@ -101,29 +104,10 @@ func (s *UserService) Register(ctx context.Context, input RegisterInput) (*Regis
 		user.Phone = input.Phone
 	}
 
-	// 保存用户
-	if err := s.userRepo.Create(ctx, user); err != nil {
-		return nil, err
-	}
-
-	// 创建用户画像
 	profile := NewUserProfile(userID)
-	if err := s.profileRepo.Create(ctx, profile); err != nil {
-		s.log.Warnf("failed to create user profile: %v", err)
-		// 非致命错误，继续
-	}
-
-	// 创建积分账户并发放初始积分 (FR-031a: 100积分)
-	creditAccount := NewCreditAccount(userID)
-	if err := s.creditRepo.Create(ctx, creditAccount); err != nil {
-		s.log.Warnf("failed to create credit account: %v", err)
-		// 非致命错误，继续
-	}
-
-	// 发放初始积分
-	initialCredits := 100.0
-	if err := s.creditRepo.AddCredits(ctx, userID, initialCredits, "registration_bonus", "registration", userID); err != nil {
-		s.log.Warnf("failed to grant initial credits: %v", err)
+	initialCredits := int64(100)
+	if err := s.userRepo.CreateWithInitialResources(ctx, user, profile, initialCredits); err != nil {
+		return nil, err
 	}
 
 	s.log.Infof("user registered: id=%d, email=%s", userID, input.Email)
@@ -153,13 +137,7 @@ type LoginOutput struct {
 
 // Login 用户登录 (FR-003)
 func (s *UserService) Login(ctx context.Context, input LoginInput) (*LoginOutput, error) {
-	// 尝试通过邮箱查找用户
-	user, err := s.userRepo.GetByEmail(ctx, input.Email)
-	if err == ErrUserNotFound {
-		// 尝试通过用户名查找
-		user, err = s.userRepo.GetByUsername(ctx, input.Email)
-	}
-
+	user, err := s.lookupUserByLoginPrincipal(ctx, input.Email)
 	if err != nil {
 		if err == ErrUserNotFound {
 			return nil, ErrInvalidCredentials
@@ -192,6 +170,15 @@ func (s *UserService) Login(ctx context.Context, input LoginInput) (*LoginOutput
 		RefreshToken: "",
 		ExpiresIn:    3600,
 	}, nil
+}
+
+// ResolveLoginUserID 根据登录标识解析稳定用户ID（用于登录锁定）
+func (s *UserService) ResolveLoginUserID(ctx context.Context, principal string) (int64, error) {
+	user, err := s.lookupUserByLoginPrincipal(ctx, principal)
+	if err != nil {
+		return 0, err
+	}
+	return user.ID, nil
 }
 
 // IssueSessionOutput 创建会话输出
@@ -234,7 +221,7 @@ func (s *UserService) RefreshSession(ctx context.Context, refreshToken string) (
 	session, err := s.sessionRepo.GetByRefreshTokenHash(ctx, HashRefreshToken(refreshToken))
 	if err != nil {
 		// 对外统一返回无效 refresh token，避免会话枚举。
-		if err == ErrSessionExpired {
+		if err == ErrSessionExpired || err == ErrSessionNotFound {
 			return nil, ErrInvalidRefreshToken
 		}
 		return nil, err
@@ -288,6 +275,26 @@ func (s *UserService) RevokeAllSessions(ctx context.Context, userID int64) ([]*S
 		return nil, err
 	}
 	return sessions, nil
+}
+
+func (s *UserService) lookupUserByLoginPrincipal(ctx context.Context, principal string) (*User, error) {
+	loginPrincipal := strings.TrimSpace(principal)
+	if loginPrincipal == "" {
+		return nil, ErrInvalidCredentials
+	}
+
+	// 邮箱登录使用 lower-case 归一化；否则按用户名查询。
+	if strings.Contains(loginPrincipal, "@") {
+		user, err := s.userRepo.GetByEmail(ctx, NormalizeEmail(loginPrincipal))
+		if err == nil {
+			return user, nil
+		}
+		if err != ErrUserNotFound {
+			return nil, err
+		}
+	}
+
+	return s.userRepo.GetByUsername(ctx, loginPrincipal)
 }
 
 // GetUser 获取用户信息
@@ -480,7 +487,7 @@ func (s *UserService) VerifyEmail(ctx context.Context, userID int64) error {
 }
 
 // GetCreditBalance 获取用户积分余额
-func (s *UserService) GetCreditBalance(ctx context.Context, userID int64) (float64, error) {
+func (s *UserService) GetCreditBalance(ctx context.Context, userID int64) (int64, error) {
 	account, err := s.creditRepo.GetByUserID(ctx, userID)
 	if err != nil {
 		return 0, err

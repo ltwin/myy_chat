@@ -4,12 +4,13 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -17,6 +18,7 @@ import (
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
 	pb "github.com/myy-chat/backend/api/user/v1"
 	"github.com/myy-chat/backend/app/user/internal/biz"
+	"github.com/myy-chat/backend/app/user/internal/security"
 	"github.com/myy-chat/backend/pkg/middleware"
 	redisclient "github.com/myy-chat/backend/pkg/redis"
 )
@@ -28,6 +30,7 @@ type UserService struct {
 	userService  *biz.UserService
 	jwtGenerator *middleware.JWTGenerator
 	blacklist    *middleware.RedisTokenBlacklist
+	loginLockout *middleware.LoginLockout
 }
 
 const (
@@ -35,17 +38,16 @@ const (
 	refreshTokenCookiePath      = "/api/v1/users/refresh"
 	refreshTokenCookieMaxAgeSec = 7 * 24 * 60 * 60
 	accessTokenExpiresInSec     = 15 * 60
-	defaultJWTSigningKey        = "myy-chat-jwt-secret-key-for-testing"
-	defaultRedisAddr            = "localhost:6379"
 )
 
 // NewUserService 创建 gRPC 用户服务
 func NewUserService(us *biz.UserService) *UserService {
-	jwtConfig := middleware.DefaultJWTConfig([]byte(resolveJWTSigningKey()))
+	jwtConfig := middleware.DefaultJWTConfig([]byte(security.ResolveJWTSigningKey()))
 	return &UserService{
 		userService:  us,
 		jwtGenerator: middleware.NewJWTGenerator(jwtConfig),
 		blacklist:    buildTokenBlacklist(),
+		loginLockout: buildLoginLockout(),
 	}
 }
 
@@ -58,6 +60,9 @@ func (s *UserService) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 		Phone:    req.Phone,
 	})
 	if err != nil {
+		if isRegistrationConflictError(err) {
+			return nil, status.Error(codes.AlreadyExists, "registration failed")
+		}
 		return nil, toGRPCError(err)
 	}
 
@@ -74,7 +79,7 @@ func (s *UserService) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 	return &pb.RegisterResponse{
 		UserId:                    output.User.ID,
 		AccessToken:               accessToken,
-		RefreshToken:              sessionOutput.RefreshToken, // deprecated: 兼容旧客户端
+		RefreshToken:              legacyRefreshTokenValue(sessionOutput.RefreshToken), // deprecated: 兼容旧客户端
 		ExpiresIn:                 accessTokenExpiresInSec,
 		EmailVerificationRequired: !output.User.EmailVerified,
 	}, nil
@@ -82,12 +87,32 @@ func (s *UserService) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 
 // Login 用户登录 (FR-003)
 func (s *UserService) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
+	lockoutID := loginPrincipalIdentifier(req.Email)
+	if resolvedUserID, err := s.userService.ResolveLoginUserID(ctx, req.Email); err == nil && resolvedUserID > 0 {
+		lockoutID = loginUserIdentifier(resolvedUserID)
+	}
+	if s.loginLockout != nil && lockoutID != "" {
+		locked, _, err := s.loginLockout.IsLocked(ctx, lockoutID)
+		if err == nil && locked {
+			return nil, status.Error(codes.ResourceExhausted, "account is locked due to too many failed attempts")
+		}
+	}
+
 	output, err := s.userService.Login(ctx, biz.LoginInput{
 		Email:    req.Email,
 		Password: req.Password,
 	})
 	if err != nil {
+		if s.loginLockout != nil && lockoutID != "" && errors.Is(err, biz.ErrInvalidCredentials) {
+			_, _ = s.loginLockout.RecordFailedAttempt(ctx, lockoutID)
+		}
 		return nil, toGRPCError(err)
+	}
+	if s.loginLockout != nil {
+		if principalID := loginPrincipalIdentifier(req.Email); principalID != "" {
+			_ = s.loginLockout.RecordSuccessfulLogin(ctx, principalID)
+		}
+		_ = s.loginLockout.RecordSuccessfulLogin(ctx, loginUserIdentifier(output.User.ID))
 	}
 
 	sessionOutput, err := s.userService.IssueSession(ctx, output.User.ID, extractUserAgent(ctx), extractClientIP(ctx))
@@ -103,7 +128,7 @@ func (s *UserService) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Logi
 	return &pb.LoginResponse{
 		UserId:       output.User.ID,
 		AccessToken:  accessToken,
-		RefreshToken: sessionOutput.RefreshToken, // deprecated: 兼容旧客户端
+		RefreshToken: legacyRefreshTokenValue(sessionOutput.RefreshToken), // deprecated: 兼容旧客户端
 		ExpiresIn:    accessTokenExpiresInSec,
 		User:         userToProto(output.User),
 	}, nil
@@ -177,7 +202,7 @@ func (s *UserService) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequ
 
 	return &pb.RefreshTokenResponse{
 		AccessToken:  accessToken,
-		RefreshToken: output.RefreshToken, // deprecated: 兼容旧客户端
+		RefreshToken: legacyRefreshTokenValue(output.RefreshToken), // deprecated: 兼容旧客户端
 		ExpiresIn:    accessTokenExpiresInSec,
 	}, nil
 }
@@ -246,6 +271,19 @@ func (s *UserService) UpdatePassword(ctx context.Context, req *pb.UpdatePassword
 	if err != nil {
 		return nil, toGRPCError(err)
 	}
+	sessions, err := s.userService.RevokeAllSessions(ctx, userID)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	if err := s.revokeAllSessionsImmediately(ctx, sessions); err != nil {
+		return nil, status.Error(codes.Internal, "failed to persist token revocation")
+	}
+	if claims, claimErr := extractClaimsFromContextOrAuthorization(ctx, s.jwtGenerator); claimErr == nil {
+		if err := s.revokeTokenImmediately(ctx, claims); err != nil {
+			return nil, status.Error(codes.Internal, "failed to persist token revocation")
+		}
+	}
+	clearRefreshTokenCookie(ctx)
 
 	return &pb.UpdatePasswordResponse{
 		Success: true,
@@ -375,27 +413,64 @@ func (s *UserService) ResetPassword(ctx context.Context, req *pb.ResetPasswordRe
 
 // 辅助函数
 
-func resolveJWTSigningKey() string {
-	for _, envKey := range []string{"MYY_CHAT_JWT_SIGNING_KEY", "JWT_SIGNING_KEY"} {
-		if signingKey := strings.TrimSpace(os.Getenv(envKey)); signingKey != "" {
-			return signingKey
-		}
-	}
-	return defaultJWTSigningKey
-}
-
 func buildTokenBlacklist() *middleware.RedisTokenBlacklist {
 	cfg := redisclient.DefaultConfig()
-	cfg.Addr = defaultRedisAddr
-	if redisAddr := strings.TrimSpace(os.Getenv("REDIS_ADDR")); redisAddr != "" {
-		cfg.Addr = redisAddr
-	}
+	cfg.Addr = security.ResolveRedisAddr()
 
 	client, err := redisclient.NewClient(cfg)
 	if err != nil {
+		if security.IsProduction() {
+			panic(fmt.Sprintf("failed to connect redis for token blacklist: %v", err))
+		}
 		return nil
 	}
 	return middleware.NewRedisTokenBlacklist(client)
+}
+
+func buildLoginLockout() *middleware.LoginLockout {
+	cfg := middleware.DefaultLoginLockoutConfig
+
+	redisCfg := redisclient.DefaultConfig()
+	redisCfg.Addr = security.ResolveRedisAddr()
+
+	client, err := redisclient.NewClient(redisCfg)
+	if err != nil {
+		if security.IsProduction() {
+			panic(fmt.Sprintf("failed to connect redis for login lockout: %v", err))
+		}
+		return middleware.NewLoginLockout(cfg, log.DefaultLogger)
+	}
+
+	cfg.RedisClient = client.Raw()
+	return middleware.NewLoginLockout(cfg, log.DefaultLogger)
+}
+
+func legacyRefreshTokenValue(refreshToken string) string {
+	if security.LegacyRefreshTokenInBodyEnabled() {
+		return refreshToken
+	}
+	return ""
+}
+
+func isRegistrationConflictError(err error) bool {
+	return errors.Is(err, biz.ErrEmailAlreadyExists) ||
+		errors.Is(err, biz.ErrUsernameAlreadyExists) ||
+		errors.Is(err, biz.ErrPhoneAlreadyExists)
+}
+
+func loginPrincipalIdentifier(principal string) string {
+	normalized := strings.ToLower(strings.TrimSpace(principal))
+	if normalized == "" {
+		return ""
+	}
+	return "principal:" + normalized
+}
+
+func loginUserIdentifier(userID int64) string {
+	if userID <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("uid:%d", userID)
 }
 
 func extractRefreshToken(ctx context.Context, fallback string) (string, error) {
@@ -538,6 +613,8 @@ func toGRPCError(err error) error {
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, biz.ErrUserAlreadyExists):
 		return status.Error(codes.AlreadyExists, err.Error())
+	case errors.Is(err, biz.ErrEmailAlreadyExists), errors.Is(err, biz.ErrUsernameAlreadyExists), errors.Is(err, biz.ErrPhoneAlreadyExists):
+		return status.Error(codes.AlreadyExists, "resource already exists")
 	case errors.Is(err, biz.ErrInvalidCredentials):
 		return status.Error(codes.Unauthenticated, err.Error())
 	case errors.Is(err, biz.ErrInvalidPassword):
@@ -546,7 +623,7 @@ func toGRPCError(err error) error {
 		return status.Error(codes.PermissionDenied, err.Error())
 	case errors.Is(err, biz.ErrEmailNotVerified):
 		return status.Error(codes.FailedPrecondition, err.Error())
-	case errors.Is(err, biz.ErrInvalidRefreshToken), errors.Is(err, biz.ErrSessionExpired), errors.Is(err, biz.ErrSessionRevoked):
+	case errors.Is(err, biz.ErrInvalidRefreshToken), errors.Is(err, biz.ErrSessionExpired), errors.Is(err, biz.ErrSessionNotFound), errors.Is(err, biz.ErrSessionRevoked):
 		return status.Error(codes.Unauthenticated, err.Error())
 	default:
 		return status.Error(codes.Internal, "internal server error")

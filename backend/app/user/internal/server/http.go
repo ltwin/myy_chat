@@ -15,6 +15,8 @@ func NewHTTPServer(c *conf.Server, userSvc *service.UserService, logger log.Logg
 	var opts = []http.ServerOption{
 		http.Middleware(
 			recovery.Recovery(),
+			loginLockoutSelectorMiddleware(logger),
+			jwtSelectorMiddleware(logger),
 		),
 	}
 	if c.Http.Network != "" {

@@ -9,7 +9,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT PRIMARY KEY,  -- 雪花ID,由应用层生成
     username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(20) UNIQUE,
     avatar_url TEXT,
@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- 索引
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE NOT is_deleted;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_users_email_lower_active ON users(lower(email)) WHERE NOT is_deleted;
+CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users(lower(email)) WHERE NOT is_deleted;
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE NOT is_deleted;
 CREATE INDEX IF NOT EXISTS idx_users_deletion_scheduled ON users(deletion_scheduled_at)
     WHERE deletion_scheduled_at IS NOT NULL;
@@ -74,9 +75,9 @@ COMMENT ON COLUMN user_profiles.user_id IS '关联users.id（应用层维护外�
 
 CREATE TABLE IF NOT EXISTS credit_accounts (
     user_id BIGINT PRIMARY KEY,  -- 关联users.id
-    balance DECIMAL(12,2) DEFAULT 0 CHECK (balance >= 0),
-    total_charged DECIMAL(12,2) DEFAULT 0,  -- 累计充值
-    total_consumed DECIMAL(12,2) DEFAULT 0,  -- 累计消费
+    balance BIGINT DEFAULT 0 CHECK (balance >= 0),
+    total_charged BIGINT DEFAULT 0,  -- 累计充值
+    total_consumed BIGINT DEFAULT 0,  -- 累计消费
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -96,8 +97,8 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
     id BIGINT PRIMARY KEY,  -- 雪花ID
     user_id BIGINT NOT NULL,
     type VARCHAR(20) NOT NULL,  -- charge, consume, refund, bonus
-    amount DECIMAL(12,2) NOT NULL,  -- 正数为增加，负数为减少
-    balance_after DECIMAL(12,2) NOT NULL,  -- 交易后余额
+    amount BIGINT NOT NULL,  -- 正数为增加，负数为减少
+    balance_after BIGINT NOT NULL,  -- 交易后余额
     description TEXT,
     reference_type VARCHAR(50),  -- order, llm_call, admin
     reference_id BIGINT,  -- 关联的订单ID或其他

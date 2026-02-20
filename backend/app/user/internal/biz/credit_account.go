@@ -9,7 +9,7 @@ import (
 
 // 积分账户相关错误
 var (
-	ErrInsufficientBalance = errors.New("insufficient credit balance")
+	ErrInsufficientBalance   = errors.New("insufficient credit balance")
 	ErrCreditAccountNotFound = errors.New("credit account not found")
 	ErrDuplicateTransaction  = errors.New("duplicate transaction")
 )
@@ -17,9 +17,9 @@ var (
 // CreditAccount 积分账户实体
 type CreditAccount struct {
 	UserID        int64     // 用户ID
-	Balance       float64   // 当前余额
-	TotalCharged  float64   // 累计充值
-	TotalConsumed float64   // 累计消费
+	Balance       int64     // 当前余额
+	TotalCharged  int64     // 累计充值
+	TotalConsumed int64     // 累计消费
 	CreatedAt     time.Time // 创建时间
 	UpdatedAt     time.Time // 更新时间
 }
@@ -38,14 +38,14 @@ func NewCreditAccount(userID int64) *CreditAccount {
 }
 
 // AddCredits 增加积分
-func (a *CreditAccount) AddCredits(amount float64) {
+func (a *CreditAccount) AddCredits(amount int64) {
 	a.Balance += amount
 	a.TotalCharged += amount
 	a.UpdatedAt = time.Now()
 }
 
 // DeductCredits 扣除积分
-func (a *CreditAccount) DeductCredits(amount float64) error {
+func (a *CreditAccount) DeductCredits(amount int64) error {
 	if a.Balance < amount {
 		return ErrInsufficientBalance
 	}
@@ -56,7 +56,7 @@ func (a *CreditAccount) DeductCredits(amount float64) error {
 }
 
 // CanAfford 检查是否有足够积分
-func (a *CreditAccount) CanAfford(amount float64) bool {
+func (a *CreditAccount) CanAfford(amount int64) bool {
 	return a.Balance >= amount
 }
 
@@ -65,8 +65,8 @@ type CreditTransaction struct {
 	ID             int64     // 交易ID (雪花ID)
 	UserID         int64     // 用户ID
 	Type           string    // 交易类型: charge, consume, refund, bonus
-	Amount         float64   // 交易金额 (正数增加，负数减少)
-	BalanceAfter   float64   // 交易后余额
+	Amount         int64     // 交易金额 (正数增加，负数减少)
+	BalanceAfter   int64     // 交易后余额
 	Description    string    // 交易描述
 	ReferenceType  string    // 关联类型: order, llm_call, admin, registration
 	ReferenceID    int64     // 关联ID
@@ -99,9 +99,9 @@ type CreditAccountRepo interface {
 	// Update 更新积分账户
 	Update(ctx context.Context, account *CreditAccount) error
 	// AddCredits 增加积分 (带交易记录)
-	AddCredits(ctx context.Context, userID int64, amount float64, reason, refType string, refID int64) error
+	AddCredits(ctx context.Context, userID int64, amount int64, reason, refType string, refID int64) error
 	// DeductCredits 扣除积分 (带交易记录)
-	DeductCredits(ctx context.Context, userID int64, amount float64, reason, refType string, refID int64, idempotencyKey string) error
+	DeductCredits(ctx context.Context, userID int64, amount int64, reason, refType string, refID int64, idempotencyKey string) error
 	// GetTransactions 获取交易记录
 	GetTransactions(ctx context.Context, userID int64, limit, offset int) ([]*CreditTransaction, int, error)
 	// Delete 删除积分账户

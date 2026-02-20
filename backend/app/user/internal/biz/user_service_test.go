@@ -30,6 +30,10 @@ func (r *mockUserRepo) Create(ctx context.Context, user *User) error {
 	return nil
 }
 
+func (r *mockUserRepo) CreateWithInitialResources(ctx context.Context, user *User, profile *UserProfile, initialCredits int64) error {
+	return r.Create(ctx, user)
+}
+
 func (r *mockUserRepo) GetByID(ctx context.Context, id int64) (*User, error) {
 	if user, ok := r.users[id]; ok {
 		return user, nil
@@ -152,7 +156,7 @@ func (r *mockCreditRepo) Update(ctx context.Context, account *CreditAccount) err
 	return nil
 }
 
-func (r *mockCreditRepo) AddCredits(ctx context.Context, userID int64, amount float64, reason, refType string, refID int64) error {
+func (r *mockCreditRepo) AddCredits(ctx context.Context, userID int64, amount int64, reason, refType string, refID int64) error {
 	if account, ok := r.accounts[userID]; ok {
 		account.AddCredits(amount)
 		return nil
@@ -160,7 +164,7 @@ func (r *mockCreditRepo) AddCredits(ctx context.Context, userID int64, amount fl
 	return ErrCreditAccountNotFound
 }
 
-func (r *mockCreditRepo) DeductCredits(ctx context.Context, userID int64, amount float64, reason, refType string, refID int64, idempotencyKey string) error {
+func (r *mockCreditRepo) DeductCredits(ctx context.Context, userID int64, amount int64, reason, refType string, refID int64, idempotencyKey string) error {
 	if account, ok := r.accounts[userID]; ok {
 		return account.DeductCredits(amount)
 	}
@@ -196,7 +200,7 @@ func (r *mockSessionRepo) GetByID(ctx context.Context, id int64) (*Session, erro
 	if s, ok := r.sessions[id]; ok {
 		return s, nil
 	}
-	return nil, ErrSessionExpired
+	return nil, ErrSessionNotFound
 }
 
 func (r *mockSessionRepo) GetByRefreshTokenHash(ctx context.Context, hash string) (*Session, error) {
@@ -205,7 +209,7 @@ func (r *mockSessionRepo) GetByRefreshTokenHash(ctx context.Context, hash string
 			return session, nil
 		}
 	}
-	return nil, ErrSessionExpired
+	return nil, ErrSessionNotFound
 }
 
 func (r *mockSessionRepo) Update(ctx context.Context, session *Session) error {
