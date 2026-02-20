@@ -43,11 +43,12 @@ make download
 ### 2. 生成代码
 
 ```bash
-# 生成所有服务的 proto 代码 + errors + validate + wire
+# 生成所有服务的 proto 代码 + openapi + errors + validate + wire
 make setup
 
 # 或分步执行
-make proto      # 生成 proto 代码
+make proto      # 生成 proto 代码（并自动生成 openapi.yaml）
+make openapi    # 单独生成聚合 OpenAPI 文档（openapi.yaml）
 make errors     # 生成 error 定义
 make validate   # 生成 validate 校验
 make generate   # 生成 wire 依赖注入
@@ -76,8 +77,9 @@ make run-admin
 |------|------|
 | `make help` | 显示所有可用命令 |
 | `make init` | 安装 protoc 插件和工具 |
-| `make proto` | 生成所有服务的 proto 代码 |
-| `make setup` | 完整设置 (proto + errors + validate + wire) |
+| `make proto` | 生成所有服务的 proto 代码（并自动生成 `openapi.yaml`） |
+| `make openapi` | 单独生成聚合 OpenAPI 文档 (`openapi.yaml`) |
+| `make setup` | 完整设置 (proto + openapi + errors + validate + wire) |
 | `make build` | 构建所有服务到 `bin/` 目录 |
 | `make test` | 运行所有单元测试 |
 | `make test-coverage` | 生成测试覆盖率报告 |
@@ -192,7 +194,7 @@ make dev
   - `*_grpc.pb.go` - gRPC 服务定义
   - `*_http.pb.go` - Kratos HTTP 路由 (可选)
   - `*.errors.pb.go` - Kratos 错误定义 (可选)
-  - `*.openapi.yaml` - OpenAPI 3.0 规范 (可选)
+  - `openapi.yaml` - 聚合 OpenAPI 3.0 文档（根目录，可导入 Apifox）
 
 ### Internal Proto (app/*/internal/conf/*.proto)
 

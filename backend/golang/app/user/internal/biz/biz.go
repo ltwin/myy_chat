@@ -1,3 +1,4 @@
+// Package biz 用户业务逻辑层
 package biz
 
 import (
@@ -5,19 +6,4 @@ import (
 )
 
 // ProviderSet is biz providers.
-var ProviderSet = wire.NewSet(NewUsecase)
-
-// Usecase is the user business usecase.
-type Usecase struct {
-	repo Repo
-}
-
-// Repo is the user repository interface.
-type Repo interface {
-	// TODO: Define your repository methods
-}
-
-// NewUsecase creates a new user usecase.
-func NewUsecase(repo Repo) *Usecase {
-	return &Usecase{repo: repo}
-}
+var ProviderSet = wire.NewSet(NewUserService)

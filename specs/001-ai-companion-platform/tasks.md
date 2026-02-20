@@ -109,12 +109,12 @@ Each implementation phase MUST include:
 
 ### Service Scaffolding (7 tasks)
 
-- [ ] T047 [P] Scaffold user service with Kratos framework in backend/golang/app/user/ (cmd/user/main.go, internal/biz/, internal/data/, internal/service/)
-- [ ] T048 [P] Scaffold character service with Kratos framework in backend/golang/app/character/
-- [ ] T049 [P] Scaffold conversation service with Kratos framework in backend/golang/app/conversation/
+- [X] T047 [P] Scaffold user service with Kratos framework in backend/golang/app/user/ (cmd/user/main.go, internal/biz/, internal/data/, internal/service/)
+- [X] T048 [P] Scaffold character service with Kratos framework in backend/golang/app/character/
+- [X] T049 [P] Scaffold conversation service with Kratos framework in backend/golang/app/conversation/
 - [ ] T050 [P] Scaffold memory service with Kratos framework in backend/golang/app/memory/
 - [ ] T051 [P] Scaffold billing service with Kratos framework in backend/golang/app/billing/
-- [ ] T052 [P] Scaffold llm-agent-service with FastAPI + gRPC in backend/python/llm-agent-service/ (FastAPI for health/debug, gRPC for service communication, calls LiteLLM Proxy for LLM)
+- [X] T052 [P] Scaffold llm-agent-service with FastAPI + gRPC in backend/python/llm-agent-service/ (FastAPI for health/debug, gRPC for service communication, calls LiteLLM Proxy for LLM)
 - [ ] T053 [P] Scaffold memory-processor with FastAPI + gRPC in backend/python/memory-processor/ (FastAPI for health/debug, gRPC for service communication)
 
 ### Docker & Deployment (18 tasks)
@@ -169,76 +169,76 @@ Each implementation phase MUST include:
 
 ### User Service Implementation (18 tasks)
 
-- [ ] T064 [P] [US1] Create User entity model in backend/golang/app/user/internal/biz/user.go with Snowflake ID, username, email, password_hash
-- [ ] T065 [P] [US1] Write unit tests for User entity in backend/golang/app/user/internal/biz/user_test.go
-- [ ] T066 [P] [US1] Create UserProfile entity model in backend/golang/app/user/internal/biz/user_profile.go
-- [ ] T067 [P] [US1] Write unit tests for UserProfile entity in backend/golang/app/user/internal/biz/user_profile_test.go
-- [ ] T068 [US1] Implement UserRepository interface in backend/golang/app/user/internal/data/user.go with pgx connection and Snowflake ID generation
+- [X] T064 [P] [US1] Create User entity model in backend/golang/app/user/internal/biz/user.go with Snowflake ID, username, email, password_hash
+- [X] T065 [P] [US1] Write unit tests for User entity in backend/golang/app/user/internal/biz/user_test.go
+- [X] T066 [P] [US1] Create UserProfile entity model in backend/golang/app/user/internal/biz/user_profile.go
+- [X] T067 [P] [US1] Write unit tests for UserProfile entity in backend/golang/app/user/internal/biz/user_profile_test.go
+- [X] T068 [US1] Implement UserRepository interface in backend/golang/app/user/internal/data/user.go with pgx connection and Snowflake ID generation
 - [ ] T069 [US1] Write unit tests for UserRepository in backend/golang/app/user/internal/data/user_test.go
-- [ ] T070 [US1] Implement UserService with Register logic in backend/golang/app/user/internal/biz/user_service.go (email validation, password bcrypt, Snowflake ID)
-- [ ] T071 [US1] Write unit tests for UserService Register in backend/golang/app/user/internal/biz/user_service_test.go
-- [ ] T072 [US1] Implement UserService Login logic in backend/golang/app/user/internal/biz/user_service.go (JWT generation)
-- [ ] T073 [US1] Write unit tests for UserService Login in backend/golang/app/user/internal/biz/user_service_test.go
-- [ ] T234 [US1] Implement login failure lockout middleware in backend/golang/pkg/middleware/login_lockout.go (5 failed attempts → 15min lockout, Redis counter with TTL)
-- [ ] T235 [US1] Write unit tests for login lockout middleware in backend/golang/pkg/middleware/login_lockout_test.go
-- [ ] T074 [US1] Implement UserService GetUser logic in backend/golang/app/user/internal/biz/user_service.go
-- [ ] T075 [US1] Write unit tests for UserService GetUser in backend/golang/app/user/internal/biz/user_service_test.go
-- [ ] T076 [US1] Implement gRPC service endpoints (Register, Login, GetUser) in backend/golang/app/user/internal/service/user_service.go
+- [X] T070 [US1] Implement UserService with Register logic in backend/golang/app/user/internal/biz/user_service.go (email validation, password bcrypt, Snowflake ID)
+- [X] T071 [US1] Write unit tests for UserService Register in backend/golang/app/user/internal/biz/user_service_test.go
+- [X] T072 [US1] Implement UserService Login logic in backend/golang/app/user/internal/biz/user_service.go (JWT generation)
+- [X] T073 [US1] Write unit tests for UserService Login in backend/golang/app/user/internal/biz/user_service_test.go
+- [X] T234 [US1] Implement login failure lockout middleware in backend/golang/pkg/middleware/login_lockout.go (5 failed attempts → 15min lockout, Redis counter with TTL)
+- [X] T235 [US1] Write unit tests for login lockout middleware in backend/golang/pkg/middleware/login_lockout_test.go
+- [X] T074 [US1] Implement UserService GetUser logic in backend/golang/app/user/internal/biz/user_service.go
+- [X] T075 [US1] Write unit tests for UserService GetUser in backend/golang/app/user/internal/biz/user_service_test.go
+- [X] T076 [US1] Implement gRPC service endpoints (Register, Login, GetUser) in backend/golang/app/user/internal/service/user_service.go
 - [ ] T077 [US1] Write integration tests for user service gRPC endpoints in backend/golang/app/user/tests/integration/user_test.go
-- [ ] T078 [US1] Add initial credit grant (100 credits) logic in UserService Register method
-- [ ] T079 [US1] Write unit tests for initial credit grant in backend/golang/app/user/internal/biz/user_service_test.go
+- [X] T078 [US1] Add initial credit grant (100 credits) logic in UserService Register method
+- [X] T079 [US1] Write unit tests for initial credit grant in backend/golang/app/user/internal/biz/user_service_test.go
 
 ### Character Service Implementation (12 tasks)
 
-- [ ] T080 [P] [US1] Create Character entity model in backend/golang/app/character/internal/biz/character.go with Snowflake ID, name, personality, background
-- [ ] T081 [P] [US1] Write unit tests for Character entity in backend/golang/app/character/internal/biz/character_test.go
-- [ ] T082 [US1] Implement CharacterRepository in backend/golang/app/character/internal/data/character.go with pgx connection
+- [X] T080 [P] [US1] Create Character entity model in backend/golang/app/character/internal/biz/character.go with Snowflake ID, name, personality, background
+- [X] T081 [P] [US1] Write unit tests for Character entity in backend/golang/app/character/internal/biz/character_test.go
+- [X] T082 [US1] Implement CharacterRepository in backend/golang/app/character/internal/data/character.go with pgx connection
 - [ ] T083 [US1] Write unit tests for CharacterRepository in backend/golang/app/character/internal/data/character_test.go
-- [ ] T084 [US1] Implement CharacterService with ListCharacters logic in backend/golang/app/character/internal/biz/character_service.go
+- [X] T084 [US1] Implement CharacterService with ListCharacters logic in backend/golang/app/character/internal/biz/character_service.go
 - [ ] T085 [US1] Write unit tests for CharacterService ListCharacters in backend/golang/app/character/internal/biz/character_service_test.go
-- [ ] T086 [US1] Implement CharacterService GetCharacter logic in backend/golang/app/character/internal/biz/character_service.go
+- [X] T086 [US1] Implement CharacterService GetCharacter logic in backend/golang/app/character/internal/biz/character_service.go
 - [ ] T087 [US1] Write unit tests for CharacterService GetCharacter in backend/golang/app/character/internal/biz/character_service_test.go
-- [ ] T088 [US1] Create database seed script with 5 preset characters in backend/golang/migrations/006_seed_characters.sql
-- [ ] T089 [US1] Implement gRPC service endpoints (ListCharacters, GetCharacter) in backend/golang/app/character/internal/service/character_service.go
+- [X] T088 [US1] Create database seed script with 5 preset characters in backend/golang/migrations/006_seed_characters.sql
+- [X] T089 [US1] Implement gRPC service endpoints (ListCharacters, GetCharacter) in backend/golang/app/character/internal/service/character_service.go
 - [ ] T090 [US1] Write integration tests for character service gRPC endpoints in backend/golang/app/character/tests/integration/character_test.go
 - [ ] T091 [US1] Add system prompt generation logic based on character personality in backend/golang/app/character/internal/biz/prompt.go
 
 ### Conversation Service Implementation (16 tasks)
 
-- [ ] T092 [P] [US1] Create Conversation entity model in backend/golang/app/conversation/internal/biz/conversation.go with Snowflake ID, user_id, character_id
-- [ ] T093 [P] [US1] Write unit tests for Conversation entity in backend/golang/app/conversation/internal/biz/conversation_test.go
-- [ ] T094 [P] [US1] Create Message entity model in backend/golang/app/conversation/internal/biz/message.go with Snowflake ID, conversation_id, role, content
-- [ ] T095 [P] [US1] Write unit tests for Message entity in backend/golang/app/conversation/internal/biz/message_test.go
-- [ ] T096 [US1] Implement ConversationRepository in backend/golang/app/conversation/internal/data/conversation.go with pgx
+- [X] T092 [P] [US1] Create Conversation entity model in backend/golang/app/conversation/internal/biz/conversation.go with Snowflake ID, user_id, character_id
+- [X] T093 [P] [US1] Write unit tests for Conversation entity in backend/golang/app/conversation/internal/biz/conversation_test.go
+- [X] T094 [P] [US1] Create Message entity model in backend/golang/app/conversation/internal/biz/message.go with Snowflake ID, conversation_id, role, content
+- [X] T095 [P] [US1] Write unit tests for Message entity in backend/golang/app/conversation/internal/biz/message_test.go
+- [X] T096 [US1] Implement ConversationRepository in backend/golang/app/conversation/internal/data/conversation.go with pgx
 - [ ] T097 [US1] Write unit tests for ConversationRepository in backend/golang/app/conversation/internal/data/conversation_test.go
-- [ ] T098 [US1] Implement MessageRepository in backend/golang/app/conversation/internal/data/message.go with pgx
+- [X] T098 [US1] Implement MessageRepository in backend/golang/app/conversation/internal/data/message.go with pgx
 - [ ] T099 [US1] Write unit tests for MessageRepository in backend/golang/app/conversation/internal/data/message_test.go
-- [ ] T100 [US1] Implement ConversationService CreateConversation logic in backend/golang/app/conversation/internal/biz/conversation_service.go
+- [X] T100 [US1] Implement ConversationService CreateConversation logic in backend/golang/app/conversation/internal/biz/conversation_service.go
 - [ ] T101 [US1] Write unit tests for CreateConversation in backend/golang/app/conversation/internal/biz/conversation_service_test.go
-- [ ] T102 [US1] Implement ConversationService SendMessage logic with LLM service call in backend/golang/app/conversation/internal/biz/conversation_service.go
+- [X] T102 [US1] Implement ConversationService SendMessage logic with LLM service call in backend/golang/app/conversation/internal/biz/conversation_service.go
 - [ ] T103 [US1] Write unit tests for SendMessage in backend/golang/app/conversation/internal/biz/conversation_service_test.go
-- [ ] T104 [US1] Implement ConversationService GetMessages logic in backend/golang/app/conversation/internal/biz/conversation_service.go
+- [X] T104 [US1] Implement ConversationService GetMessages logic in backend/golang/app/conversation/internal/biz/conversation_service.go
 - [ ] T105 [US1] Write unit tests for GetMessages in backend/golang/app/conversation/internal/biz/conversation_service_test.go
-- [ ] T106 [US1] Implement gRPC service endpoints (CreateConversation, SendMessage, GetMessages) in backend/golang/app/conversation/internal/service/conversation_service.go
+- [X] T106 [US1] Implement gRPC service endpoints (CreateConversation, SendMessage, GetMessages) in backend/golang/app/conversation/internal/service/conversation_service.go
 - [ ] T107 [US1] Write integration tests for conversation service gRPC endpoints in backend/golang/app/conversation/tests/integration/conversation_test.go
 
 ### LLM Agent Service Implementation (Python) (6 tasks)
 
 > **Note**: llm-agent-service 通过 LiteLLM Proxy 调用 LLM，无需直接集成各提供商 SDK
 
-- [ ] T108 [US1] Implement OpenAI-compatible client for LiteLLM Proxy in backend/python/llm-agent-service/app/core/llm_client.py (base_url pointing to LiteLLM Proxy, user parameter for budget)
-- [ ] T109 [US1] Write unit tests for LLM client in backend/python/llm-agent-service/tests/test_llm_client.py (mock LiteLLM Proxy responses, test budget rejection handling)
-- [ ] T110 [US1] Implement basic LangGraph agent workflow in backend/python/llm-agent-service/app/services/agent.py (no tools, just conversation)
-- [ ] T111 [US1] Write unit tests for LangGraph agent in backend/python/llm-agent-service/tests/test_agent.py
-- [ ] T112 [US1] Implement gRPC server for ChatCompletion in backend/python/llm-agent-service/app/api/grpc_server.py
+- [X] T108 [US1] Implement OpenAI-compatible client for LiteLLM Proxy in backend/python/llm-agent-service/app/core/llm_client.py (base_url pointing to LiteLLM Proxy, user parameter for budget)
+- [X] T109 [US1] Write unit tests for LLM client in backend/python/llm-agent-service/tests/test_llm_client.py (mock LiteLLM Proxy responses, test budget rejection handling)
+- [X] T110 [US1] Implement basic LangGraph agent workflow in backend/python/llm-agent-service/app/services/agent.py (no tools, just conversation)
+- [X] T111 [US1] Write unit tests for LangGraph agent in backend/python/llm-agent-service/tests/test_agent.py
+- [X] T112 [US1] Implement gRPC server for ChatCompletion in backend/python/llm-agent-service/app/api/grpc_server.py
 - [ ] T113 [US1] Write integration tests for llm-agent-service gRPC server in backend/python/llm-agent-service/tests/test_grpc_integration.py
 
 ### LLM Proxy Integration & Failover (FR-040a, FR-066) (4 tasks)
 
 > **Note**: 熔断和故障切换由 LiteLLM Proxy 内置功能处理，以下任务聚焦于集成和测试
 
-- [ ] T114 [US1] Implement LiteLLM Proxy client wrapper in backend/python/llm-agent-service/app/core/llm_proxy_client.py (OpenAI SDK pointing to LiteLLM Proxy, user parameter for budget tracking)
-- [ ] T115 [US1] Write unit tests for LiteLLM Proxy client in backend/python/llm-agent-service/tests/test_llm_proxy_client.py (test connection, error handling, user budget rejection)
+- [X] T114 [US1] Implement LiteLLM Proxy client wrapper in backend/python/llm-agent-service/app/core/llm_proxy_client.py (OpenAI SDK pointing to LiteLLM Proxy, user parameter for budget tracking)
+- [X] T115 [US1] Write unit tests for LiteLLM Proxy client in backend/python/llm-agent-service/tests/test_llm_proxy_client.py (test connection, error handling, user budget rejection)
 - [ ] T116 [US1] Configure LiteLLM Proxy fallback routes in deployments/litellm/config.yaml (gpt-4o → claude-3-5-sonnet → gemini-2.0-flash, with 3-retry and latency-based routing)
 - [ ] T117 [US1] Write E2E tests for LLM failover via LiteLLM Proxy in tests/integration/test_llm_failover_e2e.py (simulate provider failures, verify automatic switch <10s, test recovery)
 

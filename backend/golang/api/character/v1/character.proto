@@ -7,23 +7,151 @@ option java_multiple_files = true;
 option java_package = "character.v1";
 
 import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
 
-// Service is the character service definition.
-service Service {
-  // Hello is a simple hello world endpoint.
-  rpc Hello(HelloRequest) returns (HelloResponse) {
+// ============================================
+// Character Service Definition
+// ============================================
+
+service CharacterService {
+  // ListCharacters 列出角色 (公开角色 + 用户自己的角色)
+  rpc ListCharacters(ListCharactersRequest) returns (ListCharactersResponse) {
     option (google.api.http) = {
-      get: "/api/v1/character/hello"
+      get: "/api/v1/characters"
+    };
+  }
+
+  // GetCharacter 获取角色详情
+  rpc GetCharacter(GetCharacterRequest) returns (GetCharacterResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/characters/{id}"
+    };
+  }
+
+  // CreateCharacter 创建角色 (需要登录)
+  rpc CreateCharacter(CreateCharacterRequest) returns (CreateCharacterResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/characters"
+      body: "*"
+    };
+  }
+
+  // UpdateCharacter 更新角色 (仅限创建者)
+  rpc UpdateCharacter(UpdateCharacterRequest) returns (UpdateCharacterResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/characters/{id}"
+      body: "*"
+    };
+  }
+
+  // DeleteCharacter 删除角色 (仅限创建者, 软删除)
+  rpc DeleteCharacter(DeleteCharacterRequest) returns (DeleteCharacterResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/characters/{id}"
     };
   }
 }
 
-// HelloRequest is the request for Hello.
-message HelloRequest {
-  string name = 1;  // Name to greet
+// ============================================
+// List Characters Messages
+// ============================================
+
+message ListCharactersRequest {
+  int32 page = 1;         // 页码 (默认1)
+  int32 page_size = 2;    // 每页数量 (默认10, 最大100)
+  string filter = 3;      // 过滤: "all", "public", "preset", "mine" (默认all)
 }
 
-// HelloResponse is the response for Hello.
-message HelloResponse {
-  string message = 1;  // Greeting message
+message ListCharactersResponse {
+  repeated Character characters = 1;
+  int32 total = 2;        // 总数
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// ============================================
+// Get Character Messages
+// ============================================
+
+message GetCharacterRequest {
+  int64 id = 1;           // 角色ID
+}
+
+message GetCharacterResponse {
+  Character character = 1;
+}
+
+// ============================================
+// Create Character Messages
+// ============================================
+
+message CreateCharacterRequest {
+  string name = 1;                // 角色名称 (2-100字符)
+  string avatar_url = 2;          // 头像URL (可选)
+  string description = 3;         // 角色描述
+  string personality_json = 4;    // 性格设定 JSON字符串
+  string background_story = 5;    // 背景故事 (可选)
+  string speaking_style = 6;      // 说话风格 (可选)
+  string system_prompt = 7;       // 系统提示词
+  string world_view_json = 8;     // 世界观设定 JSON字符串 (可选)
+  bool is_public = 9;             // 是否公开
+}
+
+message CreateCharacterResponse {
+  Character character = 1;
+}
+
+// ============================================
+// Update Character Messages
+// ============================================
+
+message UpdateCharacterRequest {
+  int64 id = 1;                   // 角色ID
+  string name = 2;                // 新名称 (可选)
+  string avatar_url = 3;          // 新头像URL (可选)
+  string description = 4;         // 新描述 (可选)
+  string personality_json = 5;    // 新性格设定 (可选)
+  string background_story = 6;    // 新背景故事 (可选)
+  string speaking_style = 7;      // 新说话风格 (可选)
+  string system_prompt = 8;       // 新系统提示词 (可选)
+  string world_view_json = 9;     // 新世界观设定 (可选)
+  bool is_public = 10;            // 是否公开
+}
+
+message UpdateCharacterResponse {
+  Character character = 1;
+}
+
+// ============================================
+// Delete Character Messages
+// ============================================
+
+message DeleteCharacterRequest {
+  int64 id = 1;           // 角色ID
+}
+
+message DeleteCharacterResponse {
+  bool success = 1;
+}
+
+// ============================================
+// Common Types
+// ============================================
+
+// Character 角色信息
+message Character {
+  int64 id = 1;                           // 雪花ID
+  int64 user_id = 2;                      // 创建者ID (0表示预设角色)
+  string name = 3;                        // 角色名称
+  string avatar_url = 4;                  // 头像URL
+  string description = 5;                 // 角色描述
+  string personality_json = 6;            // 性格设定 JSON字符串
+  string background_story = 7;            // 背景故事
+  string speaking_style = 8;              // 说话风格
+  string system_prompt = 9;               // 系统提示词
+  string world_view_json = 10;            // 世界观设定 JSON字符串
+  bool is_public = 11;                    // 是否公开
+  bool is_preset = 12;                    // 是否预设角色
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
 }

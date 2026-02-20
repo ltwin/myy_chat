@@ -1,6 +1,6 @@
--- Migration: 003_create_characters_table
+-- Migration: 002_create_characters
 -- Description: 创建AI角色表
--- Dependencies: 001_create_users_table.sql
+-- Dependencies: 001_create_users.sql
 
 -- ================================================
 -- AI角色表 (characters)
@@ -13,11 +13,11 @@ CREATE TABLE IF NOT EXISTS characters (
     name VARCHAR(100) NOT NULL,
     avatar_url TEXT,
     description TEXT,
-    personality JSONB NOT NULL,  -- {"mbti": "ENFP", "traits": ["friendly", "curious"]}
+    personality JSONB NOT NULL DEFAULT '{}'::jsonb,  -- {"mbti": "ENFP", "traits": ["friendly", "curious"]}
     background_story TEXT,
     speaking_style TEXT,
     system_prompt TEXT NOT NULL,
-    world_view JSONB,  -- 世界观设定
+    world_view JSONB DEFAULT '{}'::jsonb,  -- 世界观设定
     is_public BOOLEAN DEFAULT FALSE,
     is_preset BOOLEAN DEFAULT FALSE,
     version INT DEFAULT 1,
@@ -33,7 +33,8 @@ CREATE INDEX IF NOT EXISTS idx_characters_public ON characters(is_public) WHERE 
 CREATE INDEX IF NOT EXISTS idx_characters_preset ON characters(is_preset) WHERE is_preset = TRUE;
 CREATE INDEX IF NOT EXISTS idx_characters_created_at ON characters(created_at);
 
--- 触发器: 自动更新 updated_at
+-- 触发器: 自动更新 updated_at（幂等）
+DROP TRIGGER IF EXISTS update_characters_updated_at ON characters;
 CREATE TRIGGER update_characters_updated_at
     BEFORE UPDATE ON characters
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -54,3 +55,16 @@ COMMENT ON COLUMN characters.is_public IS '是否公开(其他用户可见)';
 COMMENT ON COLUMN characters.is_preset IS '是否预设角色';
 COMMENT ON COLUMN characters.version IS '版本号,用于乐观锁';
 COMMENT ON COLUMN characters.is_deleted IS '软删除标记';
+
+-- ================================================
+-- 输出完成信息
+-- ================================================
+
+DO $$
+BEGIN
+    RAISE NOTICE '======================================';
+    RAISE NOTICE '角色表创建完成';
+    RAISE NOTICE '- characters: AI角色';
+    RAISE NOTICE '======================================';
+END
+$$;

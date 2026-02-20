@@ -5,14 +5,13 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/transport/http"
 
+	v1 "github.com/myy-chat/backend/golang/api/user/v1"
 	"github.com/myy-chat/backend/golang/app/user/internal/conf"
 	"github.com/myy-chat/backend/golang/app/user/internal/service"
-	// TODO: Uncomment after generating proto code
-	// v1 "github.com/myy-chat/backend/golang/api/user/v1"
 )
 
 // NewHTTPServer new an HTTP server.
-func NewHTTPServer(c *conf.Server, svc *service.Service, logger log.Logger) *http.Server {
+func NewHTTPServer(c *conf.Server, userSvc *service.UserService, logger log.Logger) *http.Server {
 	var opts = []http.ServerOption{
 		http.Middleware(
 			recovery.Recovery(),
@@ -28,7 +27,6 @@ func NewHTTPServer(c *conf.Server, svc *service.Service, logger log.Logger) *htt
 		opts = append(opts, http.Timeout(c.Http.Timeout.AsDuration()))
 	}
 	srv := http.NewServer(opts...)
-	// TODO: Register your HTTP service after proto generation
-	// v1.RegisterServiceHTTPServer(srv, svc)
+	v1.RegisterUserServiceHTTPServer(srv, userSvc)
 	return srv
 }

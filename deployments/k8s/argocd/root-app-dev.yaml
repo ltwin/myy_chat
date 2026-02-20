@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: myy-chat-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/myy_chat.git
+    targetRevision: main
+    path: deployments/k8s/argocd/apps/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: myy-chat
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+

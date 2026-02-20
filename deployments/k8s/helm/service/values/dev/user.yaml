@@ -1,0 +1,21 @@
+nameOverride: "user"
+
+image:
+  repository: "myy-chat/user"
+  tag: "dev"
+
+service:
+  port: 8080
+  targetPort: 8080
+
+env:
+  - name: DB_DSN
+    value: "REPLACE_ME"
+  - name: REDIS_ADDR
+    value: "REPLACE_ME"
+  - name: JWT_SECRET
+    value: "REPLACE_ME"
+
+autoscaling:
+  enabled: false
+

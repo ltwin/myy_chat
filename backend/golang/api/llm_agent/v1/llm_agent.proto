@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package llm_agent.v1;
+
+option go_package = "github.com/myy-chat/backend/golang/api/llm_agent/v1;v1";
+option java_multiple_files = true;
+option java_package = "llm_agent.v1";
+
+// ============================================
+// LLM Agent Service Definition
+// 用于 Go 服务与 Python LLM Agent 服务之间的内部通信
+// ============================================
+
+service LLMAgentService {
+  // ChatCompletion 非流式对话
+  rpc ChatCompletion(ChatCompletionRequest) returns (ChatCompletionResponse);
+
+  // StreamChatCompletion 流式对话
+  rpc StreamChatCompletion(ChatCompletionRequest) returns (stream ChatCompletionChunk);
+
+  // HealthCheck 健康检查
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// ============================================
+// Common Types
+// ============================================
+
+// Character 角色信息
+message Character {
+  string name = 1;                              // 角色名称
+  string personality = 2;                       // 性格描述 (JSON)
+  string background = 3;                        // 背景故事
+  string speaking_style = 4;                    // 说话风格
+  string world_view = 5;                        // 世界观设定 (JSON)
+  string system_prompt = 6;                     // 系统提示词
+  string moderation_style = 7;                  // 内容审核风格: default, strict, relaxed
+}
+
+// HistoryMessage 历史消息
+message HistoryMessage {
+  string role = 1;                              // user, assistant, system
+  string content = 2;                           // 消息内容
+}
+
+// UserPortrait 用户画像
+message UserPortrait {
+  string name = 1;                              // 用户昵称
+  int32 age = 2;                                // 年龄
+  repeated string interests = 3;                // 兴趣标签
+  string preferences = 4;                       // 用户偏好 (JSON)
+}
+
+// ConversationContext 对话上下文
+message ConversationContext {
+  string relation_type = 1;                     // 关系类型: friend, mentor, companion
+  string interaction_mode = 2;                  // 交互模式: casual, formal, playful
+  string emotional_state = 3;                   // 情感状态: neutral, happy, sad
+}
+
+// ============================================
+// ChatCompletion Messages
+// ============================================
+
+message ChatCompletionRequest {
+  string user_id = 1;                           // 用户ID (用于计费)
+  string user_message = 2;                      // 用户消息
+  Character character = 3;                      // 角色信息
+  repeated HistoryMessage message_history = 4;  // 消息历史
+  UserPortrait user_portrait = 5;               // 用户画像 (可选)
+  ConversationContext conversation_context = 6; // 对话上下文 (可选)
+  string model = 7;                             // 模型标识 (默认 gpt-4o-mini)
+  float temperature = 8;                        // 温度 (默认 0.7)
+  int32 max_tokens = 9;                         // 最大 token 数 (可选)
+}
+
+message ChatCompletionResponse {
+  string response = 1;                          // AI 响应内容
+  int32 tokens_used = 2;                        // 使用的 token 数
+  string model = 3;                             // 实际使用的模型
+  double cost = 4;                              // 消耗的积分
+  string error = 5;                             // 错误信息 (如果有)
+}
+
+// ============================================
+// StreamChatCompletion Messages
+// ============================================
+
+message ChatCompletionChunk {
+  string delta = 1;                             // 文本片段
+  bool is_final = 2;                            // 是否为最后一个片段
+  int32 tokens_used = 3;                        // 总 token 数 (仅在 is_final=true 时有值)
+  double cost = 4;                              // 总成本 (仅在 is_final=true 时有值)
+  string error = 5;                             // 错误信息 (如果有)
+}
+
+// ============================================
+// HealthCheck Messages
+// ============================================
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  bool healthy = 1;                             // 是否健康
+  string message = 2;                           // 状态消息
+  string litellm_status = 3;                    // LiteLLM Proxy 状态
+}

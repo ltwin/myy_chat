@@ -7,23 +7,347 @@ option java_multiple_files = true;
 option java_package = "user.v1";
 
 import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
 
-// Service is the user service definition.
-service Service {
-  // Hello is a simple hello world endpoint.
-  rpc Hello(HelloRequest) returns (HelloResponse) {
+// ============================================
+// User Service Definition
+// ============================================
+
+service UserService {
+  // Register 用户注册 (FR-001)
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
     option (google.api.http) = {
-      get: "/api/v1/user/hello"
+      post: "/api/v1/users/register"
+      body: "*"
+    };
+  }
+
+  // Login 用户登录 (FR-003)
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/login"
+      body: "*"
+    };
+  }
+
+  // Logout 用户登出
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/logout"
+      body: "*"
+    };
+  }
+
+  // RefreshToken 刷新令牌
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/refresh"
+      body: "*"
+    };
+  }
+
+  // GetUser 获取当前用户信息
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/me"
+    };
+  }
+
+  // UpdateUser 更新用户信息
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/users/me"
+      body: "*"
+    };
+  }
+
+  // UpdatePassword 修改密码 (FR-003c)
+  rpc UpdatePassword(UpdatePasswordRequest) returns (UpdatePasswordResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/users/me/password"
+      body: "*"
+    };
+  }
+
+  // GetProfile 获取用户画像
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/me/profile"
+    };
+  }
+
+  // UpdateProfile 更新用户画像
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/users/me/profile"
+      body: "*"
+    };
+  }
+
+  // RequestAccountDeletion 请求账号删除 (FR-004a)
+  rpc RequestAccountDeletion(RequestAccountDeletionRequest) returns (RequestAccountDeletionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/me/delete-request"
+      body: "*"
+    };
+  }
+
+  // CancelAccountDeletion 取消账号删除 (FR-004b)
+  rpc CancelAccountDeletion(CancelAccountDeletionRequest) returns (CancelAccountDeletionResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/users/me/delete-request"
+    };
+  }
+
+  // VerifyEmail 验证邮箱 (FR-002)
+  rpc VerifyEmail(VerifyEmailRequest) returns (VerifyEmailResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/verify-email"
+      body: "*"
+    };
+  }
+
+  // ResendVerification 重发验证邮件
+  rpc ResendVerification(ResendVerificationRequest) returns (ResendVerificationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/resend-verification"
+      body: "*"
+    };
+  }
+
+  // ForgotPassword 忘记密码
+  rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/forgot-password"
+      body: "*"
+    };
+  }
+
+  // ResetPassword 重置密码
+  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/reset-password"
+      body: "*"
     };
   }
 }
 
-// HelloRequest is the request for Hello.
-message HelloRequest {
-  string name = 1;  // Name to greet
+// ============================================
+// Register Messages
+// ============================================
+
+message RegisterRequest {
+  string username = 1;       // 用户名 (3-50字符)
+  string email = 2;          // 邮箱
+  string password = 3;       // 密码 (8-128字符)
+  string phone = 4;          // 手机号 (可选)
 }
 
-// HelloResponse is the response for Hello.
-message HelloResponse {
-  string message = 1;  // Greeting message
+message RegisterResponse {
+  int64 user_id = 1;         // 用户ID (Snowflake)
+  string access_token = 2;   // JWT访问令牌
+  string refresh_token = 3;  // 刷新令牌
+  int64 expires_in = 4;      // 访问令牌过期时间 (秒)
+  bool email_verification_required = 5;  // 是否需要邮箱验证
+}
+
+// ============================================
+// Login Messages
+// ============================================
+
+message LoginRequest {
+  string email = 1;          // 邮箱或用户名
+  string password = 2;       // 密码
+}
+
+message LoginResponse {
+  int64 user_id = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+  int64 expires_in = 4;
+  User user = 5;             // 用户基本信息
+}
+
+// ============================================
+// Logout Messages
+// ============================================
+
+message LogoutRequest {}
+
+message LogoutResponse {
+  bool success = 1;
+}
+
+// ============================================
+// Token Refresh Messages
+// ============================================
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message RefreshTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;  // 新的刷新令牌 (rotation)
+  int64 expires_in = 3;
+}
+
+// ============================================
+// Get User Messages
+// ============================================
+
+message GetUserRequest {
+  // user_id 从 JWT 获取，无需传入
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+// ============================================
+// Update User Messages
+// ============================================
+
+message UpdateUserRequest {
+  string username = 1;       // 新用户名 (可选)
+  string phone = 2;          // 新手机号 (可选)
+  string avatar_url = 3;     // 新头像URL (可选)
+}
+
+message UpdateUserResponse {
+  User user = 1;
+}
+
+// ============================================
+// Password Messages
+// ============================================
+
+message UpdatePasswordRequest {
+  string current_password = 1;  // 当前密码
+  string new_password = 2;      // 新密码
+}
+
+message UpdatePasswordResponse {
+  bool success = 1;
+}
+
+message ForgotPasswordRequest {
+  string email = 1;
+}
+
+message ForgotPasswordResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ResetPasswordRequest {
+  string token = 1;          // 重置令牌
+  string new_password = 2;   // 新密码
+}
+
+message ResetPasswordResponse {
+  bool success = 1;
+}
+
+// ============================================
+// Profile Messages
+// ============================================
+
+message GetProfileRequest {}
+
+message GetProfileResponse {
+  UserProfile profile = 1;
+}
+
+message UpdateProfileRequest {
+  string full_name = 1;      // 全名
+  string gender = 2;         // 性别: male, female, other
+  string birth_date = 3;     // 生日 (YYYY-MM-DD)
+  Location location = 4;     // 位置
+  repeated string interests = 5;  // 兴趣爱好
+  string occupation = 6;     // 职业
+  string bio = 7;            // 个人简介
+}
+
+message UpdateProfileResponse {
+  UserProfile profile = 1;
+}
+
+// ============================================
+// Account Deletion Messages
+// ============================================
+
+message RequestAccountDeletionRequest {
+  string password = 1;       // 确认密码
+  string reason = 2;         // 删除原因 (可选)
+}
+
+message RequestAccountDeletionResponse {
+  bool success = 1;
+  google.protobuf.Timestamp deletion_scheduled_at = 2;  // 计划删除时间 (30天后)
+}
+
+message CancelAccountDeletionRequest {}
+
+message CancelAccountDeletionResponse {
+  bool success = 1;
+}
+
+// ============================================
+// Email Verification Messages
+// ============================================
+
+message VerifyEmailRequest {
+  string token = 1;          // 验证令牌
+}
+
+message VerifyEmailResponse {
+  bool success = 1;
+}
+
+message ResendVerificationRequest {
+  string email = 1;
+}
+
+message ResendVerificationResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ============================================
+// Common Types
+// ============================================
+
+// User 用户基本信息
+message User {
+  int64 id = 1;              // 用户ID (Snowflake)
+  string username = 2;       // 用户名
+  string email = 3;          // 邮箱
+  string phone = 4;          // 手机号
+  string avatar_url = 5;     // 头像URL
+  bool email_verified = 6;   // 邮箱是否验证
+  double credit_balance = 7; // 积分余额
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp last_login_at = 9;
+  bool deletion_scheduled = 10;  // 是否已请求删除
+}
+
+// UserProfile 用户画像
+message UserProfile {
+  int64 user_id = 1;
+  string full_name = 2;
+  string gender = 3;
+  string birth_date = 4;     // YYYY-MM-DD
+  Location location = 5;
+  repeated string interests = 6;
+  string occupation = 7;
+  string bio = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+// Location 位置信息
+message Location {
+  string country = 1;
+  string city = 2;
+  string province = 3;
 }

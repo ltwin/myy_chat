@@ -7,23 +7,177 @@ option java_multiple_files = true;
 option java_package = "conversation.v1";
 
 import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
 
-// Service is the conversation service definition.
-service Service {
-  // Hello is a simple hello world endpoint.
-  rpc Hello(HelloRequest) returns (HelloResponse) {
+// ============================================
+// Conversation Service Definition
+// ============================================
+
+service ConversationService {
+  // CreateConversation 创建新会话
+  rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse) {
     option (google.api.http) = {
-      get: "/api/v1/conversation/hello"
+      post: "/api/v1/conversations"
+      body: "*"
+    };
+  }
+
+  // GetConversation 获取会话详情
+  rpc GetConversation(GetConversationRequest) returns (GetConversationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/conversations/{conversation_id}"
+    };
+  }
+
+  // ListConversations 列出用户的会话列表
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/conversations"
+    };
+  }
+
+  // SendMessage 发送消息并获取AI响应
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/conversations/{conversation_id}/messages"
+      body: "*"
+    };
+  }
+
+  // GetMessages 获取会话消息列表（分页）
+  rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/conversations/{conversation_id}/messages"
+    };
+  }
+
+  // ArchiveConversation 归档会话
+  rpc ArchiveConversation(ArchiveConversationRequest) returns (ArchiveConversationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/conversations/{conversation_id}/archive"
+      body: "*"
     };
   }
 }
 
-// HelloRequest is the request for Hello.
-message HelloRequest {
-  string name = 1;  // Name to greet
+// ============================================
+// Common Types
+// ============================================
+
+// Conversation 会话实体
+message Conversation {
+  int64 id = 1;                                 // 雪花ID
+  int64 user_id = 2;                            // 用户ID
+  int64 character_id = 3;                       // 角色ID
+  string title = 4;                             // 会话标题
+  int32 message_count = 5;                      // 消息数量
+  int32 token_count = 6;                        // Token消耗总数
+  google.protobuf.Timestamp started_at = 7;     // 会话开始时间
+  google.protobuf.Timestamp last_message_at = 8; // 最后消息时间
+  bool is_archived = 9;                         // 是否归档
 }
 
-// HelloResponse is the response for Hello.
-message HelloResponse {
-  string message = 1;  // Greeting message
+// Message 消息实体
+message Message {
+  int64 id = 1;                                 // 雪花ID
+  int64 conversation_id = 2;                    // 会话ID
+  string role = 3;                              // 消息角色: user, assistant, system
+  string content = 4;                           // 消息内容
+  int32 token_count = 5;                        // Token数量
+  MessageMetadata metadata = 6;                 // 元数据
+  google.protobuf.Timestamp created_at = 7;     // 创建时间
+}
+
+// MessageMetadata 消息元数据
+message MessageMetadata {
+  int32 latency_ms = 1;                         // 响应延迟（毫秒）
+  string model = 2;                             // 使用的模型
+  double cost = 3;                              // 成本（积分）
+}
+
+// ============================================
+// CreateConversation Messages
+// ============================================
+
+message CreateConversationRequest {
+  int64 character_id = 1;                       // 角色ID
+  string title = 2;                             // 会话标题（可选）
+}
+
+message CreateConversationResponse {
+  Conversation conversation = 1;
+}
+
+// ============================================
+// GetConversation Messages
+// ============================================
+
+message GetConversationRequest {
+  int64 conversation_id = 1;                    // 会话ID
+}
+
+message GetConversationResponse {
+  Conversation conversation = 1;
+}
+
+// ============================================
+// ListConversations Messages
+// ============================================
+
+message ListConversationsRequest {
+  int64 character_id = 1;                       // 筛选：角色ID（可选）
+  bool archived = 2;                            // 筛选：是否归档（默认false）
+  int32 page = 3;                               // 页码（从1开始）
+  int32 page_size = 4;                          // 每页数量（默认20）
+}
+
+message ListConversationsResponse {
+  repeated Conversation conversations = 1;
+  int32 total = 2;                              // 总数
+  int32 page = 3;                               // 当前页码
+  int32 page_size = 4;                          // 每页数量
+}
+
+// ============================================
+// SendMessage Messages
+// ============================================
+
+message SendMessageRequest {
+  int64 conversation_id = 1;                    // 会话ID
+  string content = 2;                           // 用户消息内容
+}
+
+message SendMessageResponse {
+  Message user_message = 1;                     // 用户消息
+  Message assistant_message = 2;                // AI响应消息
+  int32 tokens_used = 3;                        // 本次使用的Token数
+  double credits_charged = 4;                   // 本次扣除的积分
+}
+
+// ============================================
+// GetMessages Messages
+// ============================================
+
+message GetMessagesRequest {
+  int64 conversation_id = 1;                    // 会话ID
+  int64 before_message_id = 2;                  // 游标：在此消息之前（用于向上翻页）
+  int32 limit = 3;                              // 返回数量（默认50）
+}
+
+message GetMessagesResponse {
+  repeated Message messages = 1;
+  bool has_more = 2;                            // 是否有更多消息
+}
+
+// ============================================
+// ArchiveConversation Messages
+// ============================================
+
+message ArchiveConversationRequest {
+  int64 conversation_id = 1;                    // 会话ID
+  bool archived = 2;                            // true=归档, false=取消归档
+}
+
+message ArchiveConversationResponse {
+  bool success = 1;
 }

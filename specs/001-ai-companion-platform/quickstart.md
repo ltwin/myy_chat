@@ -6,6 +6,16 @@
 
 ---
 
+## Deployment Modes
+
+本项目支持三类运行/部署场景：
+
+- **Dev Run（开发/调试）**：本机运行单个微服务（例如 Go 服务用 `go run`），依赖服务用 Docker 启动；用于频繁重启调试，不属于正式部署策略。
+- **Docker Compose（单机部署）**：一台机器完整启动系统（服务+依赖），用于测试/演示/单机试运行。
+- **Kubernetes（云原生部署）**：用于生产/准生产，支持扩缩容、滚动升级、回滚与集中观测。
+
+部署矩阵与验收要点见：`specs/001-ai-companion-platform/deployment.md`
+
 ## Prerequisites
 
 ### Required Tools
@@ -39,11 +49,11 @@ git checkout 001-ai-companion-platform
 ### 2. Environment Setup
 
 ```bash
-# 复制环境变量模板
-cp deployments/docker-compose/.env.example deployments/docker-compose/.env
+# 复制环境变量模板（仓库根目录）
+cp .env.example .env
 
 # 编辑.env文件,填写必要的API密钥
-nano deployments/docker-compose/.env
+nano .env
 ```
 
 **必需配置**:
@@ -82,16 +92,14 @@ WORKER_ID=1            # 机器ID (0-31)
 ### 3. Start Services
 
 ```bash
-cd deployments/docker-compose
-
 # 启动所有服务
-docker-compose up -d
+docker compose -f deployments/docker-compose.dev.yml up -d
 
 # 查看日志
-docker-compose logs -f
+docker compose -f deployments/docker-compose.dev.yml logs -f
 
 # 检查服务状态
-docker-compose ps
+docker compose -f deployments/docker-compose.dev.yml ps
 ```
 
 **服务访问地址**:
@@ -106,13 +114,13 @@ docker-compose ps
 
 ```bash
 # 运行数据库迁移
-docker-compose exec postgres psql -U myy_chat -d myy_chat -f /scripts/init-db.sql
+docker compose -f deployments/docker-compose.dev.yml exec postgres psql -U myy_chat -d myy_chat -f /scripts/init-db.sql
 
 # 加载种子数据(预设角色)
-docker-compose exec postgres psql -U myy_chat -d myy_chat -f /scripts/seed-data.sql
+docker compose -f deployments/docker-compose.dev.yml exec postgres psql -U myy_chat -d myy_chat -f /scripts/seed-data.sql
 
 # 验证表创建
-docker-compose exec postgres psql -U myy_chat -d myy_chat -c "\dt"
+docker compose -f deployments/docker-compose.dev.yml exec postgres psql -U myy_chat -d myy_chat -c "\dt"
 ```
 
 ### 5. Verify Setup
@@ -137,6 +145,26 @@ curl http://localhost:8080/api/v1/characters?is_preset=true
 
 ---
 
+## Cloud Native Deployment (Kubernetes + Helm + Argo CD)
+
+> 本章节描述推荐的云原生交付方式与验收口径。对应的 Helm Chart/Argo Application 等资源文件需要在后续实现任务中补齐（见 `specs/001-ai-companion-platform/tasks.md` 的 Helm/HPA 任务）。
+
+### 推荐方式
+
+- **Helm**：每个微服务一个 chart，环境差异通过 values 管理。
+- **Argo CD（GitOps）**：用 Git 管理集群期望状态，提供同步、差异对比、回滚与审计。
+- 可选：**Argo Rollouts** 用于金丝雀/蓝绿发布。
+
+### 验收要点
+
+- 服务具备健康探针（readiness/liveness）并能进入 Ready。
+- 支持滚动升级与回滚（Deployment revision 或 Argo 回滚）。
+- 无状态服务支持按服务水平扩缩容（HPA）。
+
+云原生部署矩阵见：`specs/001-ai-companion-platform/deployment.md`
+
+---
+
 ## Local Development Setup
 
 ### Backend (Golang Services)
@@ -144,8 +172,8 @@ curl http://localhost:8080/api/v1/characters?is_preset=true
 #### 1. Install Dependencies
 
 ```bash
-# 进入服务目录
-cd backend/golang/user-service
+# Go 微服务目录（Kratos 大仓模式）
+cd backend/golang
 
 # 安装Go依赖
 go mod download
@@ -177,19 +205,22 @@ protoc --go_out=. --go_opt=paths=source_relative \
 
 ```bash
 # 启动PostgreSQL和Redis(使用Docker)
-docker-compose up -d postgres redis
+docker compose -f deployments/docker-compose.dev.yml up -d postgres redis
 
 # 配置环境变量
 export DB_DSN="postgres://myy_chat:password@localhost:5432/myy_chat?sslmode=disable"
 export REDIS_ADDR="localhost:6379"
 
-# 运行服务
-go run cmd/main.go
+# 运行 user 服务（示例）
+cd backend/golang/app/user
+go run ./cmd/user
 
 # 服务运行在:
 # HTTP: http://localhost:8000
 # gRPC: localhost:9000
 ```
+
+> 说明：上面的 `go run` 属于 Dev Run（开发/调试方式）。正式部署请使用 Docker Compose 或 Kubernetes。
 
 #### 4. Run Tests
 
@@ -212,7 +243,7 @@ go tool cover -html=coverage.out -o coverage.html
 #### 1. Setup Virtual Environment
 
 ```bash
-cd backend/python/llm-service
+cd backend/python/llm-agent-service
 
 # 创建虚拟环境
 python3 -m venv venv
@@ -386,7 +417,7 @@ gh pr create --title "Add character search" --body "..."
 当需要水平扩展服务时,为每个实例配置不同的 WORKER_ID:
 
 ```yaml
-# docker-compose.yml
+# deployments/docker-compose.dev.yml（示例：多实例手工分配 WORKER_ID）
 services:
   user-service-1:
     image: myy_chat/user-service
@@ -418,12 +449,12 @@ services:
 
 **启动多实例**:
 ```bash
-docker-compose up -d user-service-1 user-service-2 user-service-3
+docker compose -f deployments/docker-compose.dev.yml up -d user-service-1 user-service-2 user-service-3
 
 # 验证每个实例的 WORKER_ID
-docker-compose exec user-service-1 env | grep WORKER_ID
-docker-compose exec user-service-2 env | grep WORKER_ID
-docker-compose exec user-service-3 env | grep WORKER_ID
+docker compose -f deployments/docker-compose.dev.yml exec user-service-1 env | grep WORKER_ID
+docker compose -f deployments/docker-compose.dev.yml exec user-service-2 env | grep WORKER_ID
+docker compose -f deployments/docker-compose.dev.yml exec user-service-3 env | grep WORKER_ID
 ```
 
 ---
@@ -610,10 +641,10 @@ kubectl scale statefulset user-service -n myy-chat --replicas=2
 
 ```bash
 # 检查PostgreSQL是否运行
-docker-compose ps postgres
+docker compose -f deployments/docker-compose.dev.yml ps postgres
 
 # 查看日志
-docker-compose logs postgres
+docker compose -f deployments/docker-compose.dev.yml logs postgres
 
 # 测试连接
 psql -h localhost -U myy_chat -d myy_chat
@@ -623,7 +654,7 @@ psql -h localhost -U myy_chat -d myy_chat
 
 ```bash
 # 检查Redis
-docker-compose ps redis
+docker compose -f deployments/docker-compose.dev.yml ps redis
 
 # 测试连接
 redis-cli ping
@@ -675,20 +706,20 @@ npm run build
 
 ```bash
 # 启动所有服务
-docker-compose up -d
+docker compose -f deployments/docker-compose.dev.yml up -d
 
 # 停止所有服务
-docker-compose down
+docker compose -f deployments/docker-compose.dev.yml down
 
 # 重启特定服务
-docker-compose restart user-service
+docker compose -f deployments/docker-compose.dev.yml restart user-service
 
 # 查看日志
-docker-compose logs -f user-service
+docker compose -f deployments/docker-compose.dev.yml logs -f user-service
 
 # 进入容器
-docker-compose exec postgres bash
-docker-compose exec redis redis-cli
+docker compose -f deployments/docker-compose.dev.yml exec postgres bash
+docker compose -f deployments/docker-compose.dev.yml exec redis redis-cli
 ```
 
 ### Database

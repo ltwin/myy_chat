@@ -5,14 +5,13 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 
+	v1 "github.com/myy-chat/backend/golang/api/conversation/v1"
 	"github.com/myy-chat/backend/golang/app/conversation/internal/conf"
 	"github.com/myy-chat/backend/golang/app/conversation/internal/service"
-	// TODO: Uncomment after generating proto code
-	// v1 "github.com/myy-chat/backend/golang/api/conversation/v1"
 )
 
 // NewGRPCServer new a gRPC server.
-func NewGRPCServer(c *conf.Server, svc *service.Service, logger log.Logger) *grpc.Server {
+func NewGRPCServer(c *conf.Server, conversationSvc *service.ConversationService, logger log.Logger) *grpc.Server {
 	var opts = []grpc.ServerOption{
 		grpc.Middleware(
 			recovery.Recovery(),
@@ -28,7 +27,6 @@ func NewGRPCServer(c *conf.Server, svc *service.Service, logger log.Logger) *grp
 		opts = append(opts, grpc.Timeout(c.Grpc.Timeout.AsDuration()))
 	}
 	srv := grpc.NewServer(opts...)
-	// TODO: Register your gRPC service after proto generation
-	// v1.RegisterServiceServer(srv, svc)
+	v1.RegisterConversationServiceServer(srv, conversationSvc)
 	return srv
 }

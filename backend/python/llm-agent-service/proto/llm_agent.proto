@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package llm_agent.v1;
+
+option go_package = "github.com/myy-chat/backend/python/llm-agent-service/proto;llm_agent";
+
+// LLM Agent Service - 提供 AI 对话代理能力
+service LLMAgentService {
+  // ChatCompletion 非流式对话
+  rpc ChatCompletion(ChatCompletionRequest) returns (ChatCompletionResponse);
+
+  // StreamChatCompletion 流式对话
+  rpc StreamChatCompletion(ChatCompletionRequest) returns (stream ChatCompletionChunk);
+
+  // HealthCheck 健康检查
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// ChatCompletionRequest 对话请求
+message ChatCompletionRequest {
+  string user_id = 1;                       // 用户ID（用于预算追踪）
+  string user_message = 2;                  // 用户消息内容
+  Character character = 3;                  // 角色信息
+  repeated Message message_history = 4;     // 消息历史（可选）
+  UserPortrait user_portrait = 5;           // 用户画像（可选）
+  ConversationContext conversation_context = 6; // 对话上下文（可选）
+  string model = 7;                         // 模型标识（默认 gpt-4o-mini）
+  float temperature = 8;                    // 温度参数（默认 0.7）
+  int32 max_tokens = 9;                     // 最大 token 数（可选）
+}
+
+// ChatCompletionResponse 对话响应（非流式）
+message ChatCompletionResponse {
+  string response = 1;                      // AI 回复内容
+  int32 tokens_used = 2;                    // 本次使用的 token 数
+  string model = 3;                         // 实际使用的模型
+  string error = 4;                         // 错误信息（如果有）
+}
+
+// ChatCompletionChunk 流式对话片段
+message ChatCompletionChunk {
+  string delta = 1;                         // 文本片段
+  bool is_final = 2;                        // 是否为最后一个片段
+  string error = 3;                         // 错误信息（如果有）
+}
+
+// Character 角色信息
+message Character {
+  string name = 1;                          // 角色名称
+  string personality = 2;                   // 性格描述
+  string background = 3;                    // 背景故事
+  string speaking_style = 4;                // 说话风格
+  string world_view = 5;                    // 世界观设定
+  string moderation_style = 6;              // 审核拒绝风格（cheerful/strict/gentle/default）
+}
+
+// Message 消息
+message Message {
+  string role = 1;                          // 角色: user, assistant
+  string content = 2;                       // 消息内容
+}
+
+// UserPortrait 用户画像（Phase 4）
+message UserPortrait {
+  string name = 1;                          // 用户姓名
+  int32 age = 2;                            // 年龄
+  repeated string interests = 3;            // 兴趣爱好
+  string preferences = 4;                   // 偏好设置
+}
+
+// ConversationContext 对话上下文
+message ConversationContext {
+  string relation_type = 1;                 // 关系类型（friend/partner/mentor等）
+  string interaction_mode = 2;              // 交互模式（public/private）
+}
+
+// HealthCheckRequest 健康检查请求
+message HealthCheckRequest {}
+
+// HealthCheckResponse 健康检查响应
+message HealthCheckResponse {
+  bool healthy = 1;                         // 是否健康
+  string message = 2;                       // 消息
+}

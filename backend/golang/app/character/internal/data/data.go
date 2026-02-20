@@ -1,39 +1,85 @@
 package data
 
 import (
+	"context"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/myy-chat/backend/golang/app/character/internal/biz"
 	"github.com/myy-chat/backend/golang/app/character/internal/conf"
+	"github.com/myy-chat/backend/golang/pkg/snowflake"
 )
 
 // ProviderSet is data providers.
-var ProviderSet = wire.NewSet(NewData, NewRepo)
+var ProviderSet = wire.NewSet(
+	NewData,
+	NewPostgresPool,
+	NewSnowflakeGenerator,
+	NewCharacterRepo,
+)
 
 // Data is the data layer wrapper.
 type Data struct {
-	// TODO: Add database clients (PostgreSQL, Redis, etc.)
+	DB    *pgxpool.Pool
+	IDGen snowflake.Generator
 }
 
 // NewData creates a new data layer.
-func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
+func NewData(db *pgxpool.Pool, idGen snowflake.Generator, logger log.Logger) (*Data, func(), error) {
 	cleanup := func() {
 		log.NewHelper(logger).Info("closing the data resources")
+		db.Close()
 	}
-	return &Data{}, cleanup, nil
+	return &Data{
+		DB:    db,
+		IDGen: idGen,
+	}, cleanup, nil
 }
 
-// repo implements biz.Repo interface.
-type repo struct {
-	data *Data
-	log  *log.Helper
+// NewPostgresPool 创建 PostgreSQL 连接池
+func NewPostgresPool(c *conf.Data, logger log.Logger) (*pgxpool.Pool, error) {
+	log := log.NewHelper(logger)
+
+	config, err := pgxpool.ParseConfig(c.Database.Source)
+	if err != nil {
+		return nil, err
+	}
+
+	// 配置连接池
+	config.MaxConns = 50
+	config.MinConns = 5
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		return nil, err
+	}
+
+	// 测试连接
+	if err := pool.Ping(context.Background()); err != nil {
+		pool.Close()
+		return nil, err
+	}
+
+	log.Info("connected to PostgreSQL")
+	return pool, nil
 }
 
-// NewRepo creates a new repository.
-func NewRepo(data *Data, logger log.Logger) biz.Repo {
-	return &repo{
-		data: data,
-		log:  log.NewHelper(logger),
+// NewSnowflakeGenerator 创建雪花ID生成器
+func NewSnowflakeGenerator(logger log.Logger) (snowflake.Generator, error) {
+	gen, err := snowflake.NewGeneratorFromEnv()
+	if err != nil {
+		// 使用默认节点ID
+		gen, err = snowflake.NewGenerator(0)
+		if err != nil {
+			return nil, err
+		}
 	}
+	return gen, nil
+}
+
+// Repos 返回所有仓储接口（便于测试时 mock）
+type Repos struct {
+	CharacterRepo biz.CharacterRepo
 }

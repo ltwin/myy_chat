@@ -98,3 +98,9 @@ dmypy.json
 *.swp
 *~
 .cache/
+.ace-tool/
+
+.codex/
+.claude/
+.cursor/
+.cursorrules/

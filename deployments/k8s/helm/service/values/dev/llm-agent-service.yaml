@@ -1,0 +1,19 @@
+nameOverride: "llm-agent-service"
+
+image:
+  repository: "myy-chat/llm-agent-service"
+  tag: "dev"
+
+service:
+  port: 8000
+  targetPort: 8000
+
+env:
+  - name: LITELLM_PROXY_URL
+    value: "REPLACE_ME"
+  - name: LITELLM_API_KEY
+    value: "REPLACE_ME"
+
+autoscaling:
+  enabled: false
+

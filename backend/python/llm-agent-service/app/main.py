@@ -15,7 +15,7 @@ from fastapi import FastAPI
 
 from app.config.settings import get_settings
 from app.api import health
-from app.grpc.server import serve_grpc
+from app.api.grpc_server import serve_grpc
 
 # Configure logging
 logging.basicConfig(

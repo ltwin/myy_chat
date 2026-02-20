@@ -1,6 +1,6 @@
 -- Migration: 004_create_conversations_table
 -- Description: 创建会话表(按月分区)
--- Dependencies: 001_create_users_table.sql, 003_create_characters_table.sql
+-- Dependencies: 001_create_users.sql, 002_create_characters.sql
 
 -- ================================================
 -- 会话表 (conversations)

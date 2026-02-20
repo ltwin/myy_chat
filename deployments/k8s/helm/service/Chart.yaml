@@ -1,0 +1,7 @@
+apiVersion: v2
+name: myy-service
+description: Generic Helm chart for a stateless microservice (Deployment/Service/HPA)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
