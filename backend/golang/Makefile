@@ -8,8 +8,11 @@ GOPATH:=$(shell go env GOPATH)
 VERSION=$(shell git describe --tags --always 2>/dev/null || echo "v0.0.1")
 SEP:=/
 
-# 服务列表
-SERVICES = user conversation memory character billing admin analytics demo
+# 服务列表 (Go 服务)
+SERVICES = user conversation memory character billing admin analytics demo llm_agent
+
+# API 目录列表
+API_SERVICES = user conversation memory character billing admin analytics demo llm_agent mcp
 
 # 跨平台兼容性处理
 ifeq ($(GOHOSTOS), windows)
@@ -34,10 +37,11 @@ help:
 	@echo ""
 	@echo "代码生成命令:"
 	@echo "  make proto              - 生成所有服务的 API proto 代码"
+	@echo "  make openapi            - 生成聚合 OpenAPI 文档 (openapi.yaml)"
 	@echo "  make errors             - 生成所有服务的 error 定义"
 	@echo "  make validate           - 生成所有服务的 validate 代码"
 	@echo "  make generate           - 生成所有服务的 wire 依赖注入代码"
-	@echo "  make setup              - 执行完整设置 (proto + errors + validate + generate)"
+	@echo "  make setup              - 执行完整设置 (proto + openapi + errors + validate + generate)"
 	@echo ""
 	@echo "构建和测试:"
 	@echo "  make build              - 构建所有服务到 bin/ 目录"
@@ -92,10 +96,10 @@ download:
 # ================================================================
 
 .PHONY: proto
-# 生成所有服务的 API proto 代码 (gRPC, HTTP, OpenAPI)
+# 生成所有服务的 API proto 代码 (gRPC, HTTP) 并同步生成聚合 OpenAPI
 proto:
 	@echo ">>> 生成所有服务的 proto 代码..."
-	@for svc in $(SERVICES); do \
+	@for svc in $(API_SERVICES); do \
 		echo "  - 生成 $$svc proto..."; \
 		if [ -d api/$$svc/v1 ]; then \
 			protoc \
@@ -104,13 +108,24 @@ proto:
 				--go_out=paths=source_relative:./api \
 				--go-http_out=paths=source_relative:./api \
 				--go-grpc_out=paths=source_relative:./api \
-				--openapi_out=fq_schema_naming=true,default_response=false:. \
 				api/$$svc/v1/*.proto; \
 		else \
 			echo "    [跳过] api/$$svc/v1 不存在"; \
 		fi; \
 	done
+	@$(MAKE) --no-print-directory openapi
 	@echo "✓ Proto 代码生成完成!"
+
+.PHONY: openapi
+# 生成聚合 OpenAPI 文档 (供 Apifox 等平台导入)
+openapi:
+	@echo ">>> 生成聚合 OpenAPI 文档..."
+	@protoc \
+		--proto_path=./api \
+		--proto_path=./third_party \
+		--openapi_out=fq_schema_naming=true,default_response=false:. \
+		$(API_PROTO_FILES)
+	@echo "✓ OpenAPI 文档生成完成: openapi.yaml"
 
 # Python 服务列表 (需要生成 Python gRPC 代码)
 PYTHON_SERVICES = user conversation memory character billing
@@ -199,7 +214,7 @@ generate:
 	@echo "✓ Wire 代码生成完成!"
 
 .PHONY: setup
-# 完整设置: proto + errors + validate + wire
+# 完整设置: proto + openapi + errors + validate + wire
 setup:
 	@echo ">>> 执行完整设置流程..."
 	@make proto
@@ -263,8 +278,8 @@ $(addprefix proto-,$(SERVICES)):
 			--go_out=paths=source_relative:./api \
 			--go-http_out=paths=source_relative:./api \
 			--go-grpc_out=paths=source_relative:./api \
-			--openapi_out=fq_schema_naming=true,default_response=false:. \
 			api/$$svc/v1/*.proto; \
+		$(MAKE) --no-print-directory openapi; \
 		echo "✓ $$svc proto 生成完成!"; \
 	else \
 		echo "✗ api/$$svc/v1 不存在"; \

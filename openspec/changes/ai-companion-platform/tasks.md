@@ -842,12 +842,12 @@ Phase 5 (测试部署)
 ## Acceptance Checklist
 
 ### 构建验收
-- [ ] `make setup` 编译通过
-- [ ] 所有 proto 代码生成完整（含 billing/v1 + memory/v1 + mcp/v1）
-- [ ] llm-agent（Go）服务编译与启动通过
-- [ ] Python llm-agent 构建入口已从 CI/部署链路剔除
-- [ ] billing-service 独立构建通过
-- [ ] memory-service 独立构建通过
+- [x] `make setup` 编译通过
+- [x] 所有 proto 代码生成完整（含 billing/v1 + memory/v1 + mcp/v1）
+- [x] llm-agent（Go）服务编译与启动通过
+- [x] Python llm-agent 构建入口已从 CI/部署链路剔除
+- [x] billing-service 独立构建通过
+- [x] memory-service 独立构建通过
 
 ### 部署验收
 - [ ] docker-compose 所有容器 healthy（含 mcp-service + memory-service + llm-agent + LiteLLM）

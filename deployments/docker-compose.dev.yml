@@ -339,17 +339,15 @@ services:
 
   llm-agent-service:
     build:
-      context: ../backend/python/llm-agent-service
-      dockerfile: Dockerfile
+      context: ../backend/golang
+      dockerfile: app/llm_agent/Dockerfile
     container_name: myy-chat-llm-agent-service
     restart: unless-stopped
     environment:
-      LLM_AGENT_HTTP_PORT: 8000
-      LLM_AGENT_GRPC_PORT: 9000
-      LITELLM_PROXY_URL: http://litellm:4000
-      LITELLM_API_KEY: ${LITELLM_MASTER_KEY:-sk-myy-chat-dev-key}
-      REDIS_URL: redis://redis:6379
-      DATABASE_URL: postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}
+      DATABASE_DSN: postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}?sslmode=disable
+      REDIS_ADDR: redis:6379
+      GRPC_PORT: 9000
+      HTTP_PORT: 8000
     ports:
       - "8006:8000"
       - "9006:9000"
