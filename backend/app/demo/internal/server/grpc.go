@@ -5,10 +5,10 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 
-	"github.com/myy-chat/backend/golang/app/demo/internal/conf"
-	"github.com/myy-chat/backend/golang/app/demo/internal/service"
+	"github.com/myy-chat/backend/app/demo/internal/conf"
+	"github.com/myy-chat/backend/app/demo/internal/service"
 	// TODO: Uncomment after generating proto code
-	// v1 "github.com/myy-chat/backend/golang/api/demo/v1"
+	// v1 "github.com/myy-chat/backend/api/demo/v1"
 )
 
 // NewGRPCServer new a gRPC server.

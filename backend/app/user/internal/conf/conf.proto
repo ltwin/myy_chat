@@ -1,7 +1,7 @@
 syntax = "proto3";
 package kratos.api;
 
-option go_package = "github.com/myy-chat/backend/golang/app/user/internal/conf;conf";
+option go_package = "github.com/myy-chat/backend/app/user/internal/conf;conf";
 
 import "google/protobuf/duration.proto";
 

@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/myy-chat/backend/golang/app/character/internal/biz"
+	"github.com/myy-chat/backend/app/character/internal/biz"
 )
 
 // characterRepo 角色仓储实现

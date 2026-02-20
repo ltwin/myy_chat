@@ -11,8 +11,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/myy-chat/backend/golang/app/user/internal/biz"
-	"github.com/myy-chat/backend/golang/pkg/snowflake"
+	"github.com/myy-chat/backend/app/user/internal/biz"
+	"github.com/myy-chat/backend/pkg/snowflake"
 )
 
 // creditAccountRepo 积分账户仓储实现

@@ -9,9 +9,9 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	pb "github.com/myy-chat/backend/golang/api/character/v1"
-	"github.com/myy-chat/backend/golang/app/character/internal/biz"
-	"github.com/myy-chat/backend/golang/pkg/middleware"
+	pb "github.com/myy-chat/backend/api/character/v1"
+	"github.com/myy-chat/backend/app/character/internal/biz"
+	"github.com/myy-chat/backend/pkg/middleware"
 )
 
 // CharacterService gRPC 角色服务实现

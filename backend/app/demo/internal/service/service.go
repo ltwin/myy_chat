@@ -3,7 +3,7 @@ package service
 import (
 	"github.com/google/wire"
 
-	"github.com/myy-chat/backend/golang/app/demo/internal/biz"
+	"github.com/myy-chat/backend/app/demo/internal/biz"
 )
 
 // ProviderSet is service providers.

@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 
-	"github.com/myy-chat/backend/golang/app/conversation/internal/biz"
+	"github.com/myy-chat/backend/app/conversation/internal/biz"
 )
 
 // llmClient LLM 服务客户端实现

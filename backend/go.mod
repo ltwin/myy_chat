@@ -1,4 +1,4 @@
-module github.com/myy-chat/backend/golang
+module github.com/myy-chat/backend
 
 go 1.24.0
 

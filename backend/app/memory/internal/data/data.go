@@ -4,8 +4,8 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
 
-	"github.com/myy-chat/backend/golang/app/memory/internal/biz"
-	"github.com/myy-chat/backend/golang/app/memory/internal/conf"
+	"github.com/myy-chat/backend/app/memory/internal/biz"
+	"github.com/myy-chat/backend/app/memory/internal/conf"
 )
 
 // ProviderSet is data providers.

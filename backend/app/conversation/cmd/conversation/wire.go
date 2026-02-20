@@ -8,11 +8,11 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
 
-	"github.com/myy-chat/backend/golang/app/conversation/internal/biz"
-	"github.com/myy-chat/backend/golang/app/conversation/internal/conf"
-	"github.com/myy-chat/backend/golang/app/conversation/internal/data"
-	"github.com/myy-chat/backend/golang/app/conversation/internal/server"
-	"github.com/myy-chat/backend/golang/app/conversation/internal/service"
+	"github.com/myy-chat/backend/app/conversation/internal/biz"
+	"github.com/myy-chat/backend/app/conversation/internal/conf"
+	"github.com/myy-chat/backend/app/conversation/internal/data"
+	"github.com/myy-chat/backend/app/conversation/internal/server"
+	"github.com/myy-chat/backend/app/conversation/internal/service"
 )
 
 // wireApp init kratos application.

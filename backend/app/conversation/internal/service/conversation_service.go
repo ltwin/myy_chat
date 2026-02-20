@@ -9,9 +9,9 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	pb "github.com/myy-chat/backend/golang/api/conversation/v1"
-	"github.com/myy-chat/backend/golang/app/conversation/internal/biz"
-	"github.com/myy-chat/backend/golang/pkg/middleware"
+	pb "github.com/myy-chat/backend/api/conversation/v1"
+	"github.com/myy-chat/backend/app/conversation/internal/biz"
+	"github.com/myy-chat/backend/pkg/middleware"
 )
 
 // ConversationService gRPC 会话服务实现

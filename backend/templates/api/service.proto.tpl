@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package {{SERVICE}}.v1;
 
-option go_package = "github.com/myy-chat/backend/golang/api/{{SERVICE}}/v1;v1";
+option go_package = "github.com/myy-chat/backend/api/{{SERVICE}}/v1;v1";
 option java_multiple_files = true;
 option java_package = "{{SERVICE}}.v1";
 

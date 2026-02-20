@@ -7,9 +7,9 @@ import (
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/myy-chat/backend/golang/app/character/internal/biz"
-	"github.com/myy-chat/backend/golang/app/character/internal/conf"
-	"github.com/myy-chat/backend/golang/pkg/snowflake"
+	"github.com/myy-chat/backend/app/character/internal/biz"
+	"github.com/myy-chat/backend/app/character/internal/conf"
+	"github.com/myy-chat/backend/pkg/snowflake"
 )
 
 // ProviderSet is data providers.

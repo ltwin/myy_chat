@@ -5,10 +5,10 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/transport/http"
 
-	"github.com/myy-chat/backend/golang/app/memory/internal/conf"
-	"github.com/myy-chat/backend/golang/app/memory/internal/service"
+	"github.com/myy-chat/backend/app/memory/internal/conf"
+	"github.com/myy-chat/backend/app/memory/internal/service"
 	// TODO: Uncomment after generating proto code
-	// v1 "github.com/myy-chat/backend/golang/api/memory/v1"
+	// v1 "github.com/myy-chat/backend/api/memory/v1"
 )
 
 // NewHTTPServer new an HTTP server.

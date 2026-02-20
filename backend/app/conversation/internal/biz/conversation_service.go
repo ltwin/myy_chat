@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 
-	"github.com/myy-chat/backend/golang/pkg/snowflake"
+	"github.com/myy-chat/backend/pkg/snowflake"
 )
 
 // 业务错误

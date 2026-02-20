@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/myy-chat/backend/golang/app/user/internal/biz"
+	"github.com/myy-chat/backend/app/user/internal/biz"
 )
 
 // sessionRepo 会话仓储实现

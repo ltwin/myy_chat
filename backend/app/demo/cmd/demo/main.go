@@ -11,7 +11,7 @@ import (
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/go-kratos/kratos/v2/transport/http"
 
-	"github.com/myy-chat/backend/golang/app/demo/internal/conf"
+	"github.com/myy-chat/backend/app/demo/internal/conf"
 )
 
 // go build -ldflags "-X main.Version=x.y.z"

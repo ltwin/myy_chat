@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/myy-chat/backend/golang/app/conversation/internal/biz"
+	"github.com/myy-chat/backend/app/conversation/internal/biz"
 )
 
 // messageRepo 消息仓储实现

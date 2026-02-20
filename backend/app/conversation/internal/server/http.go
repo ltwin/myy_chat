@@ -5,9 +5,9 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/transport/http"
 
-	v1 "github.com/myy-chat/backend/golang/api/conversation/v1"
-	"github.com/myy-chat/backend/golang/app/conversation/internal/conf"
-	"github.com/myy-chat/backend/golang/app/conversation/internal/service"
+	v1 "github.com/myy-chat/backend/api/conversation/v1"
+	"github.com/myy-chat/backend/app/conversation/internal/conf"
+	"github.com/myy-chat/backend/app/conversation/internal/service"
 )
 
 // NewHTTPServer new an HTTP server.

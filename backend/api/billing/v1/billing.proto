@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package billing.v1;
 
-option go_package = "github.com/myy-chat/backend/golang/api/billing/v1;v1";
+option go_package = "github.com/myy-chat/backend/api/billing/v1;v1";
 option java_multiple_files = true;
 option java_package = "billing.v1";
 

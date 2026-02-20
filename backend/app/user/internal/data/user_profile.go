@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lib/pq"
 
-	"github.com/myy-chat/backend/golang/app/user/internal/biz"
+	"github.com/myy-chat/backend/app/user/internal/biz"
 )
 
 // userProfileRepo 用户画像仓储实现
