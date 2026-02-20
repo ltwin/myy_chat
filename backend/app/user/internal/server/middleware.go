@@ -15,20 +15,7 @@ import (
 	redisclient "github.com/myy-chat/backend/pkg/redis"
 )
 
-func loginLockoutSelectorMiddleware(logger log.Logger) kratosmiddleware.Middleware {
-	lockoutConfig := authmiddleware.DefaultLoginLockoutConfig
-	redis := newRedisClient(logger)
-	if redis != nil {
-		lockoutConfig.RedisClient = redis.Raw()
-	}
-
-	lockout := authmiddleware.NewLoginLockout(lockoutConfig, logger)
-	return selector.Server(lockout.Middleware()).
-		Path(v1.OperationUserServiceLogin).
-		Build()
-}
-
-func jwtSelectorMiddleware(logger log.Logger) kratosmiddleware.Middleware {
+func jwtSelectorMiddleware(redis *redisclient.Client) kratosmiddleware.Middleware {
 	jwtConfig := authmiddleware.DefaultJWTConfig([]byte(security.ResolveJWTSigningKey()))
 	jwtConfig.ErrorHandler = func(ctx context.Context, err error) error {
 		switch {
@@ -46,7 +33,7 @@ func jwtSelectorMiddleware(logger log.Logger) kratosmiddleware.Middleware {
 		}
 	}
 
-	if redis := newRedisClient(logger); redis != nil {
+	if redis != nil {
 		jwtConfig.BlacklistChecker = authmiddleware.NewRedisTokenBlacklist(redis)
 	}
 
@@ -65,17 +52,22 @@ func jwtSelectorMiddleware(logger log.Logger) kratosmiddleware.Middleware {
 		Build()
 }
 
-func newRedisClient(logger log.Logger) *redisclient.Client {
+// NewAuthRedisClient creates one shared Redis client for auth-related components.
+func NewAuthRedisClient(logger log.Logger) (*redisclient.Client, func(), error) {
 	cfg := redisclient.DefaultConfig()
 	cfg.Addr = security.ResolveRedisAddr()
 
 	client, err := redisclient.NewClient(cfg)
 	if err != nil {
 		if security.IsProduction() {
-			panic("failed to connect redis for auth middleware")
+			return nil, nil, err
 		}
-		log.NewHelper(logger).Warnf("redis disabled for auth middleware: %v", err)
-		return nil
+		log.NewHelper(logger).Warnf("redis disabled for auth components: %v", err)
+		return nil, func() {}, nil
 	}
-	return client
+
+	cleanup := func() {
+		_ = client.Close()
+	}
+	return client, cleanup, nil
 }

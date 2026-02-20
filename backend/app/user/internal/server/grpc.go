@@ -1,22 +1,21 @@
 package server
 
 import (
-	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 
 	v1 "github.com/myy-chat/backend/api/user/v1"
 	"github.com/myy-chat/backend/app/user/internal/conf"
 	"github.com/myy-chat/backend/app/user/internal/service"
+	redisclient "github.com/myy-chat/backend/pkg/redis"
 )
 
 // NewGRPCServer new a gRPC server.
-func NewGRPCServer(c *conf.Server, userSvc *service.UserService, logger log.Logger) *grpc.Server {
+func NewGRPCServer(c *conf.Server, userSvc *service.UserService, redis *redisclient.Client) *grpc.Server {
 	var opts = []grpc.ServerOption{
 		grpc.Middleware(
 			recovery.Recovery(),
-			loginLockoutSelectorMiddleware(logger),
-			jwtSelectorMiddleware(logger),
+			jwtSelectorMiddleware(redis),
 		),
 	}
 	if c.Grpc.Network != "" {

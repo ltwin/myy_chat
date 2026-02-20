@@ -41,13 +41,13 @@ const (
 )
 
 // NewUserService 创建 gRPC 用户服务
-func NewUserService(us *biz.UserService) *UserService {
+func NewUserService(us *biz.UserService, redis *redisclient.Client, logger log.Logger) *UserService {
 	jwtConfig := middleware.DefaultJWTConfig([]byte(security.ResolveJWTSigningKey()))
 	return &UserService{
 		userService:  us,
 		jwtGenerator: middleware.NewJWTGenerator(jwtConfig),
-		blacklist:    buildTokenBlacklist(),
-		loginLockout: buildLoginLockout(),
+		blacklist:    buildTokenBlacklist(redis),
+		loginLockout: buildLoginLockout(redis, logger),
 	}
 }
 
@@ -172,7 +172,7 @@ func (s *UserService) LogoutAll(ctx context.Context, req *pb.LogoutAllRequest) (
 		return nil, status.Error(codes.Internal, "failed to persist token revocation")
 	}
 	if claims != nil {
-		if err := s.revokeTokenImmediately(ctx, claims); err != nil {
+		if err := s.revokeTokenJTI(ctx, claims); err != nil {
 			return nil, status.Error(codes.Internal, "failed to persist token revocation")
 		}
 	}
@@ -279,7 +279,7 @@ func (s *UserService) UpdatePassword(ctx context.Context, req *pb.UpdatePassword
 		return nil, status.Error(codes.Internal, "failed to persist token revocation")
 	}
 	if claims, claimErr := extractClaimsFromContextOrAuthorization(ctx, s.jwtGenerator); claimErr == nil {
-		if err := s.revokeTokenImmediately(ctx, claims); err != nil {
+		if err := s.revokeTokenJTI(ctx, claims); err != nil {
 			return nil, status.Error(codes.Internal, "failed to persist token revocation")
 		}
 	}
@@ -413,36 +413,19 @@ func (s *UserService) ResetPassword(ctx context.Context, req *pb.ResetPasswordRe
 
 // 辅助函数
 
-func buildTokenBlacklist() *middleware.RedisTokenBlacklist {
-	cfg := redisclient.DefaultConfig()
-	cfg.Addr = security.ResolveRedisAddr()
-
-	client, err := redisclient.NewClient(cfg)
-	if err != nil {
-		if security.IsProduction() {
-			panic(fmt.Sprintf("failed to connect redis for token blacklist: %v", err))
-		}
+func buildTokenBlacklist(redis *redisclient.Client) *middleware.RedisTokenBlacklist {
+	if redis == nil {
 		return nil
 	}
-	return middleware.NewRedisTokenBlacklist(client)
+	return middleware.NewRedisTokenBlacklist(redis)
 }
 
-func buildLoginLockout() *middleware.LoginLockout {
+func buildLoginLockout(redis *redisclient.Client, logger log.Logger) *middleware.LoginLockout {
 	cfg := middleware.DefaultLoginLockoutConfig
-
-	redisCfg := redisclient.DefaultConfig()
-	redisCfg.Addr = security.ResolveRedisAddr()
-
-	client, err := redisclient.NewClient(redisCfg)
-	if err != nil {
-		if security.IsProduction() {
-			panic(fmt.Sprintf("failed to connect redis for login lockout: %v", err))
-		}
-		return middleware.NewLoginLockout(cfg, log.DefaultLogger)
+	if redis != nil {
+		cfg.RedisClient = redis.Raw()
 	}
-
-	cfg.RedisClient = client.Raw()
-	return middleware.NewLoginLockout(cfg, log.DefaultLogger)
+	return middleware.NewLoginLockout(cfg, logger)
 }
 
 func legacyRefreshTokenValue(refreshToken string) string {
@@ -557,6 +540,20 @@ func (s *UserService) revokeTokenImmediately(ctx context.Context, claims *middle
 
 	if err := s.blacklist.RevokeSID(ctx, claims.SessionID, 7*24*time.Hour); err != nil {
 		return err
+	}
+
+	jtiTTL := 15 * time.Minute
+	if claims.ExpiresAt != nil {
+		if ttl := time.Until(claims.ExpiresAt.Time); ttl > 0 {
+			jtiTTL = ttl
+		}
+	}
+	return s.blacklist.RevokeJTI(ctx, claims.ID, jtiTTL)
+}
+
+func (s *UserService) revokeTokenJTI(ctx context.Context, claims *middleware.UserClaims) error {
+	if s.blacklist == nil || claims == nil {
+		return nil
 	}
 
 	jtiTTL := 15 * time.Minute
