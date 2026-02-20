@@ -3,6 +3,8 @@ package middleware
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
@@ -17,15 +19,27 @@ import (
 var (
 	ErrMissingToken     = errors.New("missing authorization token")
 	ErrInvalidToken     = errors.New("invalid token")
+	ErrInvalidClaims    = errors.New("invalid token claims")
 	ErrExpiredToken     = errors.New("token has expired")
 	ErrInvalidSignature = errors.New("invalid token signature")
+	ErrTokenRevoked     = errors.New("token has been revoked")
+	ErrBlacklistCheck   = errors.New("failed to validate token revocation status")
 )
 
 // UserClaims JWT 用户声明
 type UserClaims struct {
 	UserID   int64  `json:"user_id"`
 	Username string `json:"username"`
+	// SessionID 对应 sessions.id，作为会话绑定锚点
+	SessionID int64 `json:"sid"`
+	// TokenType 取值 access/refresh
+	TokenType string `json:"token_type"`
 	jwt.RegisteredClaims
+}
+
+// TokenBlacklistChecker 用于检查 token/session 是否已撤销
+type TokenBlacklistChecker interface {
+	IsRevoked(ctx context.Context, sid int64, jti string) (bool, error)
 }
 
 // contextKey 上下文键类型
@@ -60,18 +74,35 @@ type JWTConfig struct {
 	TokenExpiration time.Duration
 	// RefreshExpiration 刷新令牌过期时间
 	RefreshExpiration time.Duration
+	// Issuer 签发方
+	Issuer string
+	// Audience 受众
+	Audience string
+	// Leeway 时钟偏移容忍
+	Leeway time.Duration
+	// RequireSIDAccess 校验 access token 时是否强制要求 sid>0
+	RequireSIDAccess bool
+	// BlacklistChecker token 黑名单检查器（可选）
+	BlacklistChecker TokenBlacklistChecker
+	// FailOpenOnBlacklistError 黑名单检查异常时是否放行
+	FailOpenOnBlacklistError bool
 }
 
 // DefaultJWTConfig 默认 JWT 配置
 func DefaultJWTConfig(signingKey []byte) JWTConfig {
 	return JWTConfig{
-		SigningKey:        signingKey,
-		SigningMethod:     jwt.SigningMethodHS256,
-		TokenLookup:       "header:Authorization",
-		AuthScheme:        "Bearer",
-		Claims:            func() jwt.Claims { return &UserClaims{} },
-		TokenExpiration:   time.Hour * 24,       // 24小时
-		RefreshExpiration: time.Hour * 24 * 7,   // 7天
+		SigningKey:               signingKey,
+		SigningMethod:            jwt.SigningMethodHS256,
+		TokenLookup:              "header:Authorization",
+		AuthScheme:               "Bearer",
+		Claims:                   func() jwt.Claims { return &UserClaims{} },
+		TokenExpiration:          15 * time.Minute,   // 15分钟
+		RefreshExpiration:        7 * 24 * time.Hour, // 7天
+		Issuer:                   "myy-chat",
+		Audience:                 "myy-chat-api",
+		Leeway:                   30 * time.Second,
+		RequireSIDAccess:         true,
+		FailOpenOnBlacklistError: false,
 	}
 }
 
@@ -104,13 +135,18 @@ func JWTAuth(config JWTConfig) middleware.Middleware {
 
 			// 解析和验证 token
 			claims := config.Claims()
-			parsedToken, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
-				// 验证签名算法
-				if t.Method.Alg() != config.SigningMethod.Alg() {
-					return nil, ErrInvalidSignature
-				}
-				return config.SigningKey, nil
-			})
+			parsedToken, err := jwt.ParseWithClaims(
+				token,
+				claims,
+				func(t *jwt.Token) (interface{}, error) {
+					// 验证签名算法
+					if t.Method.Alg() != config.SigningMethod.Alg() {
+						return nil, ErrInvalidSignature
+					}
+					return config.SigningKey, nil
+				},
+				parserOptions(config)...,
+			)
 
 			if err != nil {
 				if errors.Is(err, jwt.ErrTokenExpired) {
@@ -132,15 +168,46 @@ func JWTAuth(config JWTConfig) middleware.Middleware {
 				return nil, ErrInvalidToken
 			}
 
+			userClaims, ok := claims.(*UserClaims)
+			if !ok {
+				if config.ErrorHandler != nil {
+					return nil, config.ErrorHandler(ctx, ErrInvalidClaims)
+				}
+				return nil, ErrInvalidClaims
+			}
+
+			if err := validateUserClaims(userClaims, config); err != nil {
+				if config.ErrorHandler != nil {
+					return nil, config.ErrorHandler(ctx, err)
+				}
+				return nil, err
+			}
+
+			if config.BlacklistChecker != nil {
+				revoked, err := config.BlacklistChecker.IsRevoked(ctx, userClaims.SessionID, userClaims.ID)
+				if err != nil {
+					if !config.FailOpenOnBlacklistError {
+						if config.ErrorHandler != nil {
+							return nil, config.ErrorHandler(ctx, ErrBlacklistCheck)
+						}
+						return nil, ErrBlacklistCheck
+					}
+				}
+				if revoked {
+					if config.ErrorHandler != nil {
+						return nil, config.ErrorHandler(ctx, ErrTokenRevoked)
+					}
+					return nil, ErrTokenRevoked
+				}
+			}
+
 			// 将 claims 存入上下文
 			if config.SuccessHandler != nil {
 				ctx = config.SuccessHandler(ctx, claims)
 			} else {
 				ctx = WithClaims(ctx, claims)
-				if userClaims, ok := claims.(*UserClaims); ok {
-					ctx = WithUserID(ctx, userClaims.UserID)
-					ctx = WithUsername(ctx, userClaims.Username)
-				}
+				ctx = WithUserID(ctx, userClaims.UserID)
+				ctx = WithUsername(ctx, userClaims.Username)
 			}
 
 			return handler(ctx, req)
@@ -178,9 +245,72 @@ func extractToken(header transport.Header, config JWTConfig) string {
 	return ""
 }
 
+func parserOptions(config JWTConfig) []jwt.ParserOption {
+	opts := []jwt.ParserOption{
+		jwt.WithValidMethods([]string{config.SigningMethod.Alg()}),
+	}
+	if config.Issuer != "" {
+		opts = append(opts, jwt.WithIssuer(config.Issuer))
+	}
+	if config.Audience != "" {
+		opts = append(opts, jwt.WithAudience(config.Audience))
+	}
+	if config.Leeway > 0 {
+		opts = append(opts, jwt.WithLeeway(config.Leeway))
+	}
+	return opts
+}
+
+func validateUserClaims(claims *UserClaims, config JWTConfig) error {
+	if claims == nil || claims.UserID <= 0 {
+		return ErrInvalidClaims
+	}
+
+	// 兼容历史 token：TokenType 缺失时回退到 Subject 推断。
+	if claims.TokenType == "" {
+		switch claims.Subject {
+		case "access_token":
+			claims.TokenType = "access"
+		case "refresh_token":
+			claims.TokenType = "refresh"
+		default:
+			return ErrInvalidClaims
+		}
+	}
+
+	switch claims.TokenType {
+	case "access":
+		if claims.Subject != "access_token" {
+			return ErrInvalidClaims
+		}
+		if config.RequireSIDAccess && claims.SessionID <= 0 {
+			return ErrInvalidClaims
+		}
+	case "refresh":
+		if claims.Subject != "refresh_token" {
+			return ErrInvalidClaims
+		}
+	default:
+		return ErrInvalidClaims
+	}
+
+	if claims.ID == "" {
+		return ErrInvalidClaims
+	}
+	return nil
+}
+
 // JWTGenerator JWT 生成器
 type JWTGenerator struct {
 	config JWTConfig
+}
+
+func generateTokenID() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 // NewJWTGenerator 创建 JWT 生成器
@@ -190,17 +320,38 @@ func NewJWTGenerator(config JWTConfig) *JWTGenerator {
 
 // GenerateToken 生成访问令牌
 func (g *JWTGenerator) GenerateToken(userID int64, username string) (string, error) {
+	// 兼容旧调用方：未显式传 sid 时回退使用 userID。
+	return g.GenerateTokenWithSession(userID, username, userID)
+}
+
+// GenerateTokenWithSession 生成携带 sid/jti 的访问令牌
+func (g *JWTGenerator) GenerateTokenWithSession(userID int64, username string, sid int64) (string, error) {
+	if sid <= 0 {
+		return "", ErrInvalidClaims
+	}
+	jti, err := generateTokenID()
+	if err != nil {
+		return "", err
+	}
+
 	now := time.Now()
+	registered := jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(now.Add(g.config.TokenExpiration)),
+		IssuedAt:  jwt.NewNumericDate(now),
+		NotBefore: jwt.NewNumericDate(now),
+		Issuer:    g.config.Issuer,
+		Subject:   "access_token",
+		ID:        jti,
+	}
+	if g.config.Audience != "" {
+		registered.Audience = jwt.ClaimStrings{g.config.Audience}
+	}
 	claims := &UserClaims{
-		UserID:   userID,
-		Username: username,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(now.Add(g.config.TokenExpiration)),
-			IssuedAt:  jwt.NewNumericDate(now),
-			NotBefore: jwt.NewNumericDate(now),
-			Issuer:    "myy-chat",
-			Subject:   "access_token",
-		},
+		UserID:           userID,
+		Username:         username,
+		SessionID:        sid,
+		TokenType:        "access",
+		RegisteredClaims: registered,
 	}
 
 	token := jwt.NewWithClaims(g.config.SigningMethod, claims)
@@ -209,17 +360,38 @@ func (g *JWTGenerator) GenerateToken(userID int64, username string) (string, err
 
 // GenerateRefreshToken 生成刷新令牌
 func (g *JWTGenerator) GenerateRefreshToken(userID int64, username string) (string, error) {
+	// 兼容旧调用方：未显式传 sid 时回退使用 userID。
+	return g.GenerateRefreshTokenWithSession(userID, username, userID)
+}
+
+// GenerateRefreshTokenWithSession 生成携带 sid/jti 的刷新令牌
+func (g *JWTGenerator) GenerateRefreshTokenWithSession(userID int64, username string, sid int64) (string, error) {
+	if sid <= 0 {
+		return "", ErrInvalidClaims
+	}
+	jti, err := generateTokenID()
+	if err != nil {
+		return "", err
+	}
+
 	now := time.Now()
+	registered := jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(now.Add(g.config.RefreshExpiration)),
+		IssuedAt:  jwt.NewNumericDate(now),
+		NotBefore: jwt.NewNumericDate(now),
+		Issuer:    g.config.Issuer,
+		Subject:   "refresh_token",
+		ID:        jti,
+	}
+	if g.config.Audience != "" {
+		registered.Audience = jwt.ClaimStrings{g.config.Audience}
+	}
 	claims := &UserClaims{
-		UserID:   userID,
-		Username: username,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(now.Add(g.config.RefreshExpiration)),
-			IssuedAt:  jwt.NewNumericDate(now),
-			NotBefore: jwt.NewNumericDate(now),
-			Issuer:    "myy-chat",
-			Subject:   "refresh_token",
-		},
+		UserID:           userID,
+		Username:         username,
+		SessionID:        sid,
+		TokenType:        "refresh",
+		RegisteredClaims: registered,
 	}
 
 	token := jwt.NewWithClaims(g.config.SigningMethod, claims)
@@ -228,12 +400,17 @@ func (g *JWTGenerator) GenerateRefreshToken(userID int64, username string) (stri
 
 // GenerateTokenPair 生成访问令牌和刷新令牌对
 func (g *JWTGenerator) GenerateTokenPair(userID int64, username string) (accessToken, refreshToken string, err error) {
-	accessToken, err = g.GenerateToken(userID, username)
+	return g.GenerateTokenPairWithSession(userID, username, userID)
+}
+
+// GenerateTokenPairWithSession 生成同会话绑定的令牌对
+func (g *JWTGenerator) GenerateTokenPairWithSession(userID int64, username string, sid int64) (accessToken, refreshToken string, err error) {
+	accessToken, err = g.GenerateTokenWithSession(userID, username, sid)
 	if err != nil {
 		return "", "", err
 	}
 
-	refreshToken, err = g.GenerateRefreshToken(userID, username)
+	refreshToken, err = g.GenerateRefreshTokenWithSession(userID, username, sid)
 	if err != nil {
 		return "", "", err
 	}
@@ -243,12 +420,17 @@ func (g *JWTGenerator) GenerateTokenPair(userID int64, username string) (accessT
 
 // ParseToken 解析令牌
 func (g *JWTGenerator) ParseToken(tokenString string) (*UserClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(t *jwt.Token) (interface{}, error) {
-		if t.Method.Alg() != g.config.SigningMethod.Alg() {
-			return nil, ErrInvalidSignature
-		}
-		return g.config.SigningKey, nil
-	})
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		&UserClaims{},
+		func(t *jwt.Token) (interface{}, error) {
+			if t.Method.Alg() != g.config.SigningMethod.Alg() {
+				return nil, ErrInvalidSignature
+			}
+			return g.config.SigningKey, nil
+		},
+		parserOptions(g.config)...,
+	)
 
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
@@ -263,7 +445,11 @@ func (g *JWTGenerator) ParseToken(tokenString string) (*UserClaims, error) {
 
 	claims, ok := token.Claims.(*UserClaims)
 	if !ok {
-		return nil, ErrInvalidToken
+		return nil, ErrInvalidClaims
+	}
+
+	if err := validateUserClaims(claims, g.config); err != nil {
+		return nil, err
 	}
 
 	return claims, nil
@@ -277,11 +463,11 @@ func (g *JWTGenerator) RefreshToken(refreshTokenString string) (newAccessToken, 
 	}
 
 	// 验证是刷新令牌
-	if claims.Subject != "refresh_token" {
+	if claims.Subject != "refresh_token" || claims.TokenType != "refresh" {
 		return "", "", ErrInvalidToken
 	}
 
-	return g.GenerateTokenPair(claims.UserID, claims.Username)
+	return g.GenerateTokenPairWithSession(claims.UserID, claims.Username, claims.SessionID)
 }
 
 // Context 辅助函数
@@ -345,10 +531,16 @@ func HTTPStatusFromError(err error) int {
 		return http.StatusUnauthorized
 	case errors.Is(err, ErrInvalidToken):
 		return http.StatusUnauthorized
+	case errors.Is(err, ErrInvalidClaims):
+		return http.StatusUnauthorized
 	case errors.Is(err, ErrExpiredToken):
 		return http.StatusUnauthorized
 	case errors.Is(err, ErrInvalidSignature):
 		return http.StatusUnauthorized
+	case errors.Is(err, ErrTokenRevoked):
+		return http.StatusUnauthorized
+	case errors.Is(err, ErrBlacklistCheck):
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
 	}

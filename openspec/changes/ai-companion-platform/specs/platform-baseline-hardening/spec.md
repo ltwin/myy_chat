@@ -25,3 +25,25 @@ Database migrations MUST be repeatable and non-conflicting: SQL scripts MUST use
 - **WHEN** a new migration is added after existing `000`-`006` migrations
 - **THEN** the new files MUST use subsequent numbers (`007+`) and MUST NOT overwrite semantics of existing migration IDs
 
+### Requirement: Token Transport and Revocation Hardening
+Authentication pipeline MUST enforce split token transport (`access token` in Authorization header, `refresh token` in secure HttpOnly cookie) and MUST support immediate token invalidation via blacklist on logout.
+
+#### Scenario: Protected API rejects non-header access token transport
+- **WHEN** a protected HTTP API request carries access token via URL query parameter instead of `Authorization` header
+- **THEN** gateway/backend MUST treat it as unauthorized according to configured policy
+
+#### Scenario: Refresh authentication uses HttpOnly cookie
+- **WHEN** client calls refresh endpoint
+- **THEN** server MUST authenticate refresh token from secure HttpOnly cookie and MUST NOT require frontend JavaScript to submit refresh token plaintext
+
+#### Scenario: Logout triggers immediate invalidation
+- **WHEN** user logs out from current device
+- **THEN** server MUST revoke the bound session and blacklist current token identity (`sid` and/or `jti`) so subsequent requests fail immediately without waiting for token natural expiry
+
+#### Scenario: Logout-all invalidates every active session
+- **WHEN** authenticated user invokes logout-all endpoint
+- **THEN** system MUST revoke all active sessions for that user and reject subsequent requests from previously active tokens
+
+#### Scenario: Revocation check infrastructure failure does not silently bypass security
+- **WHEN** Redis blacklist dependency is unavailable during token verification
+- **THEN** system MUST follow explicit failure policy (default fail-closed), or enter controlled degraded mode with server-side session revocation fallback

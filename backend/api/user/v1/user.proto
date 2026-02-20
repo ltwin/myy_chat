@@ -38,6 +38,14 @@ service UserService {
     };
   }
 
+  // LogoutAll 用户退出所有设备
+  rpc LogoutAll(LogoutAllRequest) returns (LogoutAllResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/users/logout-all"
+      body: "*"
+    };
+  }
+
   // RefreshToken 刷新令牌
   rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
     option (google.api.http) = {
@@ -146,7 +154,7 @@ message RegisterRequest {
 message RegisterResponse {
   int64 user_id = 1;         // 用户ID (Snowflake)
   string access_token = 2;   // JWT访问令牌
-  string refresh_token = 3;  // 刷新令牌
+  string refresh_token = 3 [deprecated = true];  // 已弃用：改为 HttpOnly Cookie 传输
   int64 expires_in = 4;      // 访问令牌过期时间 (秒)
   bool email_verification_required = 5;  // 是否需要邮箱验证
 }
@@ -163,7 +171,7 @@ message LoginRequest {
 message LoginResponse {
   int64 user_id = 1;
   string access_token = 2;
-  string refresh_token = 3;
+  string refresh_token = 3 [deprecated = true];  // 已弃用：改为 HttpOnly Cookie 传输
   int64 expires_in = 4;
   User user = 5;             // 用户基本信息
 }
@@ -178,17 +186,25 @@ message LogoutResponse {
   bool success = 1;
 }
 
+message LogoutAllRequest {}
+
+message LogoutAllResponse {
+  bool success = 1;
+}
+
 // ============================================
 // Token Refresh Messages
 // ============================================
 
 message RefreshTokenRequest {
-  string refresh_token = 1;
+  // 已弃用：refresh token 由浏览器通过 HttpOnly Cookie 自动携带。
+  // 为兼容旧客户端暂时保留，后续版本删除。
+  string refresh_token = 1 [deprecated = true];
 }
 
 message RefreshTokenResponse {
   string access_token = 1;
-  string refresh_token = 2;  // 新的刷新令牌 (rotation)
+  string refresh_token = 2 [deprecated = true];  // 已弃用：新 refresh token 通过 Set-Cookie 下发
   int64 expires_in = 3;
 }
 

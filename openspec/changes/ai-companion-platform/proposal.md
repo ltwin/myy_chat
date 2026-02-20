@@ -98,6 +98,10 @@
 | HC-008 | 测试覆盖率 | ≥70% |
 | HC-009 | 健康检查路径 | /api/v1/health |
 | HC-010 | 登录锁定 | 5次失败后锁定15分钟 |
+| HC-011 | Token 传输策略 | access token 走 Authorization Header；refresh token 走 HttpOnly Secure SameSite Cookie |
+| HC-012 | 登出失效语义 | 基于 Redis 黑名单实现“登出立即失效”（不等待 access token 自然过期） |
+| HC-013 | 黑名单故障策略 | Redis 黑名单检查默认 fail-closed，受控降级需有会话回查兜底 |
+| HC-014 | Cookie 安全 | refresh/logout/logout-all 必须通过 CSRF 防护验收 |
 
 ---
 

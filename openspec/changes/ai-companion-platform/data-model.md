@@ -72,6 +72,14 @@
 ### 2.7 认证安全存储约定（MVP）
 
 - 登录失败锁定（5次/15分钟）由 Redis TTL 计数实现，不在 PostgreSQL 新增 `login_attempts` 表。
+- Access token 仅经 `Authorization: Bearer` 传输，前端仅内存保存，不落地浏览器持久存储。
+- Refresh token 使用 `HttpOnly + Secure + SameSite` Cookie 传输（Cookie Path 收敛到 `/api/v1/users/refresh`）；PostgreSQL 仅保存 `sessions.refresh_token_hash`。
+- `sessions.id` 作为 access token `sid` claim 的绑定锚点，实现 JWT 与服务端会话关联。
+- 登出“立即失效”通过 Redis 黑名单实现，不新增 PostgreSQL 黑名单表。
+  - `auth:blacklist:sid:{sid}`：会话级封禁，TTL 至少覆盖该会话剩余生命周期
+  - `auth:blacklist:jti:{jti}`：令牌级封禁，TTL 对齐 access token 剩余生命周期
+- 黑名单校验默认采用 fail-closed：Redis 不可用时拒绝受保护请求，避免已撤销 token 被误放行。
+- refresh/logout 接口采用 Cookie 鉴权时必须配套 CSRF 防护（Origin/Referer 校验与 CSRF token 机制）。
 - 密码重置流程（token/邮件链路）延期到 v1.1，不阻塞当前 MVP 数据模型验收。
 
 ---
@@ -235,6 +243,11 @@ CREATE INDEX idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
 CREATE INDEX idx_sessions_refresh_active ON sessions(refresh_token_hash)
 WHERE revoked_at IS NULL;
+
+-- sessions 为 refresh token 的服务端会话锚点：
+-- 1) refresh token 明文不入库，仅保存 hash
+-- 2) session.id 对应 access token 的 sid claim
+-- 3) access token 立即失效依赖 Redis 黑名单（sid/jti），不额外新增 PG 表
 ```
 
 ### 4.2 角色与会话消息域
@@ -780,6 +793,11 @@ CREATE TABLE system_configs (
 - [ ] `user_profiles`（账号资料 SoT）与 `user_portraits`（对话画像 SoT）边界已在服务层落地，且无双向自动覆盖。
 - [ ] Agent 画像写路径仅经 `mcp-service -> memory-service`，无直写数据库旁路。
 - [ ] 前端依赖接口字段（MemoryList/Update/Delete/Audit）已可从本模型直接映射。
+- [ ] access token 传输策略已收敛为 `Authorization Header`，并确认未再依赖 query token。
+- [ ] refresh token 仅通过 `HttpOnly + Secure + SameSite` Cookie 传输（Path 最小作用域为 `/api/v1/users/refresh`），服务端仅存 hash。
+- [ ] Redis 黑名单键（`sid/jti`）TTL 策略已与 access/refresh 生命周期对齐（支持登出立即失效）。
+- [ ] Redis 故障场景已明确 fail-closed 或受控降级回查策略（不可出现无保护放行）。
+- [ ] Cookie 鉴权端点（refresh/logout/logout-all）已启用 CSRF 防护并通过集成测试。
 
 
 ---

@@ -28,7 +28,7 @@ type SessionConfig struct {
 
 // DefaultSessionConfig 默认会话配置
 var DefaultSessionConfig = SessionConfig{
-	RefreshTokenTTL: 30 * 24 * time.Hour, // 30天
+	RefreshTokenTTL: 7 * 24 * time.Hour, // 7天
 }
 
 // NewSession 创建新会话
@@ -100,6 +100,17 @@ func (s *Session) IsValid() bool {
 // VerifyRefreshToken 验证刷新令牌
 func (s *Session) VerifyRefreshToken(token string) bool {
 	return s.RefreshTokenHash == hashToken(token)
+}
+
+// RotateRefreshToken 轮换刷新令牌并重置过期时间
+func (s *Session) RotateRefreshToken(ttl time.Duration) (string, error) {
+	refreshToken, err := generateRefreshToken()
+	if err != nil {
+		return "", err
+	}
+	s.RefreshTokenHash = hashToken(refreshToken)
+	s.ExpiresAt = time.Now().Add(ttl)
+	return refreshToken, nil
 }
 
 // Extend 延长会话有效期

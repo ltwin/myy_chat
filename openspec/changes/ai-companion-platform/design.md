@@ -387,6 +387,54 @@ Agent
 - 登录失败锁定（5 次失败 / 15 分钟）使用 Redis TTL 计数实现，不新增 `login_attempts` 关系表。
 - 密码重置 token 与邮件链路不纳入当前 MVP，实现延期到 v1.1（见 proposal Deferred Features）。
 
+### Token Transport Policy (MVP)
+
+- Access Token 仅通过 `Authorization: Bearer <token>` 传递；受保护 API 禁止使用 query token 作为主链路。
+- 前端仅在内存（`AuthContext` / runtime state）保存 access token，不落地到 `localStorage/sessionStorage`。
+- Refresh Token 使用随机 opaque token，由 user-service 写入 `HttpOnly + Secure + SameSite` Cookie（建议名：`rt`，Path `/api/v1/users/refresh`，最小作用域）。
+- `/api/v1/users/refresh` 从 Cookie 读取 refresh token 并执行 rotation；响应体只返回新的 access token，refresh token 继续通过 Set-Cookie 下发。
+- `/api/v1/users/logout` 撤销会话后清除 refresh cookie（`Max-Age=0`，Path 需与 refresh cookie 保持一致），避免浏览器继续携带旧 token。
+- refresh/logout/logout-all 属于 Cookie 鉴权写操作，必须启用 CSRF 防护：`Origin/Referer` 白名单校验 + 双提交 CSRF token（`X-CSRF-Token`）至少其一不可缺省。
+
+### Session Binding Policy
+
+- `sessions.id` 作为 `sid`（session id）写入 access token claims，形成“JWT ↔ 会话行”绑定。
+- access token 必须包含：`user_id`、`sid`、`jti`、`token_type=access`、`exp`。
+- 鉴权必须校验 `iss/aud/exp/nbf`，并配置时钟偏移容忍（`leeway`）；禁止仅做签名校验。
+- refresh token 不信任明文，服务端仅保存 `sessions.refresh_token_hash`，并通过 hash 比对验证。
+
+### Immediate Revocation by Blacklist
+
+为支持“登出立即失效”（不等待 access token 自然过期），引入 Redis 黑名单：
+
+- `auth:blacklist:sid:{sid}`：会话级封禁；TTL = `max(access_ttl, sessions.expires_at-now)`。
+- `auth:blacklist:jti:{jti}`：令牌级封禁（安全事件/定向失效）；TTL = `access_token.exp-now`。
+
+登出（单设备）流程：
+
+1. 从当前 access token 提取 `user_id/sid/jti`。
+2. 事务内写 `sessions.revoked_at=now()`（仅当前 sid）。
+3. 写入 `sid`（必需）与 `jti`（可选增强）黑名单键。
+4. 返回成功并清除 refresh cookie。
+
+鉴权中间件流程：
+
+1. 验签并校验 access token 标准 claims。
+2. 查询 `sid` 与 `jti` 黑名单键（任一命中即 `UNAUTHORIZED`）。
+3. 仅在未命中黑名单时将 `user_id` 注入上下文。
+
+黑名单依赖故障策略（必须实现）：
+
+- 默认 `fail-closed`：黑名单检查错误时拒绝请求（返回 503/401），避免已撤销 token 被放行。
+- 可选降级（显式开关）：`fail-open` 仅允许在紧急模式启用，并强制回查 `sessions.revoked_at` 兜底。
+- Redis 持久化要求：AOF `everysec` + 重启恢复校验；黑名单恢复期间受保护写接口默认拒绝。
+
+多端退出策略：
+
+- “退出当前设备”仅撤销当前 `sid`，不影响其他设备。
+- “退出全部设备”执行 `RevokeAllByUserID` 并批量写入活跃 `sid` 黑名单键。
+- API 合约要求显式提供 `/api/v1/users/logout-all`，禁止以“空入参 logout”隐式表达全设备退出。
+
 ---
 
 ## Billing Service Boundary (SoT Definition)
@@ -546,6 +594,9 @@ SendMessage 主链路与长期记忆写入链路解耦，采用 **异步事件�
 ## Gateway & Deployment Baseline
 
 - APISIX 必须启用 CORS 白名单（按环境区分 `dev/staging/prod` Origin），允许前端 SPA 跨域访问 `/api/v1/*`。
+- CORS 禁止 `allow_origins="*"` 与 `allow_credential=true` 组合；必须显式 Origin 白名单。
+- APISIX 在受保护 HTTP API 上仅接受 `Authorization` Header 鉴权，禁用 query token 主链路，避免 token 出现在 URL/日志中。
+- 服务侧仍需执行 JWT 严格校验（`iss/aud/sid/jti` + 黑名单）作为二次防线，不将 APISIX 校验视为唯一信任边界。
 - LiteLLM Proxy 作为独立部署单元（Compose/K8s），llm-agent 通过内网地址调用并使用密钥配置。
 - LiteLLM 健康检查与超时策略纳入部署验收：不可用时 llm-agent 返回可观测错误并触发降级策略。
 
@@ -565,10 +616,11 @@ Frontend ──WebSocket──→ conversation-service (Go)
 
 ### 连接管理
 
-- **鉴权**: WebSocket 连接建立时通过 query param 或首条消息携带 JWT
+- **鉴权**: WebSocket 连接建立时通过首条 `AUTH` 消息（或 `Sec-WebSocket-Protocol`）携带 access token，禁止 query param 透传 token
 - **心跳**: 30s ping/pong，超时断开
 - **重连**: 客户端指数退避重连（1s, 2s, 4s, 8s, max 30s）
 - **多端**: 同一 user_id 可维护多个连接，消息广播到所有连接
+- **撤销联动**: `sid` 被撤销/拉黑后，服务端必须主动关闭该 `sid` 下所有 WS 连接（不等待客户端重连）
 
 ### 多实例扩展方案（v1.1）
 

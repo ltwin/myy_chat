@@ -7,6 +7,18 @@ WebSocket connections for conversation sync MUST be authenticated with JWT at co
 - **WHEN** a client connects without a valid JWT
 - **THEN** server MUST reject or close the connection with an authorization error
 
+#### Scenario: Revoked session token is rejected immediately
+- **WHEN** JWT is cryptographically valid but its `sid/jti` is present in server-side blacklist
+- **THEN** server MUST reject the WebSocket connection (or close it immediately) with an authorization error
+
+#### Scenario: Token in URL query is not accepted as primary auth channel
+- **WHEN** client attempts to pass JWT via WebSocket URL query parameter
+- **THEN** server MUST reject or ignore that token source according to security policy, and require authenticated handshake via approved channel
+
+#### Scenario: Active websocket is terminated after session revocation
+- **WHEN** a connected client session is revoked by logout or logout-all
+- **THEN** server MUST proactively close all WebSocket connections bound to that revoked `sid`
+
 ### Requirement: Heartbeat and Reconnect Safety
 Realtime channel MUST implement heartbeat and reconnect semantics to keep session liveness predictable.
 
@@ -31,4 +43,3 @@ Streaming message chunks and completion events MUST preserve causal order per me
 #### Scenario: Chunk order is stable per message stream
 - **WHEN** assistant response is emitted over websocket
 - **THEN** chunk events MUST be delivered in generation order before final completion event
-

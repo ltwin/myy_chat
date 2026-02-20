@@ -46,6 +46,9 @@ func TestGenerateToken(t *testing.T) {
 			assert.Equal(t, tt.username, claims.Username)
 			assert.Equal(t, "access_token", claims.Subject)
 			assert.Equal(t, "myy-chat", claims.Issuer)
+			assert.Equal(t, "access", claims.TokenType)
+			assert.Equal(t, tt.userID, claims.SessionID)
+			assert.NotEmpty(t, claims.ID)
 		})
 	}
 }
@@ -67,6 +70,9 @@ func TestGenerateRefreshToken(t *testing.T) {
 	assert.Equal(t, userID, claims.UserID)
 	assert.Equal(t, username, claims.Username)
 	assert.Equal(t, "refresh_token", claims.Subject)
+	assert.Equal(t, "refresh", claims.TokenType)
+	assert.Equal(t, userID, claims.SessionID)
+	assert.NotEmpty(t, claims.ID)
 }
 
 func TestGenerateTokenPair(t *testing.T) {
@@ -86,11 +92,14 @@ func TestGenerateTokenPair(t *testing.T) {
 	accessClaims, err := generator.ParseToken(accessToken)
 	require.NoError(t, err)
 	assert.Equal(t, "access_token", accessClaims.Subject)
+	assert.NotEmpty(t, accessClaims.ID)
 
 	// 验证 refresh token
 	refreshClaims, err := generator.ParseToken(refreshToken)
 	require.NoError(t, err)
 	assert.Equal(t, "refresh_token", refreshClaims.Subject)
+	assert.NotEmpty(t, refreshClaims.ID)
+	assert.Equal(t, accessClaims.SessionID, refreshClaims.SessionID)
 }
 
 func TestParseToken_Valid(t *testing.T) {
@@ -144,10 +153,26 @@ func TestParseToken_WrongSigningKey(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestParseToken_WrongAudience(t *testing.T) {
+	config := DefaultJWTConfig(testSigningKey)
+	generator := NewJWTGenerator(config)
+
+	wrongAudienceConfig := DefaultJWTConfig(testSigningKey)
+	wrongAudienceConfig.Audience = "another-audience"
+	wrongAudienceGenerator := NewJWTGenerator(wrongAudienceConfig)
+
+	token, err := wrongAudienceGenerator.GenerateToken(12345, "testuser")
+	require.NoError(t, err)
+
+	_, err = generator.ParseToken(token)
+	assert.Error(t, err)
+}
+
 func TestParseToken_Expired(t *testing.T) {
 	// 创建一个短过期时间的配置
 	config := DefaultJWTConfig(testSigningKey)
 	config.TokenExpiration = -1 * time.Second // 已过期
+	config.Leeway = 0
 
 	generator := NewJWTGenerator(config)
 
@@ -238,6 +263,8 @@ func TestHTTPStatusFromError(t *testing.T) {
 		{"invalid token", ErrInvalidToken, 401},
 		{"expired token", ErrExpiredToken, 401},
 		{"invalid signature", ErrInvalidSignature, 401},
+		{"revoked token", ErrTokenRevoked, 401},
+		{"blacklist unavailable", ErrBlacklistCheck, 503},
 		{"unknown error", assert.AnError, 500},
 	}
 
@@ -256,15 +283,21 @@ func TestDefaultJWTConfig(t *testing.T) {
 	assert.Equal(t, jwt.SigningMethodHS256, config.SigningMethod)
 	assert.Equal(t, "header:Authorization", config.TokenLookup)
 	assert.Equal(t, "Bearer", config.AuthScheme)
-	assert.Equal(t, 24*time.Hour, config.TokenExpiration)
+	assert.Equal(t, 15*time.Minute, config.TokenExpiration)
 	assert.Equal(t, 7*24*time.Hour, config.RefreshExpiration)
+	assert.Equal(t, "myy-chat", config.Issuer)
+	assert.Equal(t, "myy-chat-api", config.Audience)
+	assert.Equal(t, 30*time.Second, config.Leeway)
+	assert.True(t, config.RequireSIDAccess)
 	assert.NotNil(t, config.Claims)
 }
 
 func TestUserClaims(t *testing.T) {
 	claims := &UserClaims{
-		UserID:   12345,
-		Username: "testuser",
+		UserID:    12345,
+		Username:  "testuser",
+		SessionID: 12345,
+		TokenType: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -289,6 +322,7 @@ func TestSkipPaths(t *testing.T) {
 func TestTokenExpiration(t *testing.T) {
 	config := DefaultJWTConfig(testSigningKey)
 	config.TokenExpiration = 1 * time.Second // 使用1秒，更可靠
+	config.Leeway = 0
 	generator := NewJWTGenerator(config)
 
 	token, err := generator.GenerateToken(12345, "testuser")

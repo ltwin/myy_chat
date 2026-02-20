@@ -105,6 +105,54 @@
 - **测试**: 验证 token 解析、过期、无效签名
 - **验收**: 登录返回有效 JWT
 
+#### T2.1.3a Access Token Claims 绑定会话
+- **文件**: `backend/app/user/internal/biz/session.go`, `backend/pkg/middleware/auth.go`
+- **操作**: access token 增补 `sid/jti/token_type=access` claims，并将 `sid` 与 `sessions.id` 对齐
+- **测试**: claims 编解码、sid 绑定一致性、缺失 claims 拒绝
+- **验收**: 受保护接口可从 JWT 稳定提取 `user_id + sid + jti`
+
+#### T2.1.3b Refresh Token Cookie 化与 Rotation
+- **文件**: `backend/app/user/internal/service/user_service.go`, `backend/app/user/internal/biz/session.go`
+- **操作**: refresh token 改为 `HttpOnly + Secure + SameSite` Cookie 传输，并将 Cookie `Path` 收敛到 `/api/v1/users/refresh`；`/users/refresh` 从 Cookie 读取并轮换 refresh token（旧 token 失效）
+- **测试**: Set-Cookie 属性校验（含 Path 最小作用域）、rotation 幂等、旧 refresh token 重放失败
+- **验收**: 登录/刷新后浏览器获得安全 Cookie，服务端仅存 refresh token hash
+
+#### T2.1.3c 登出立即失效（Session 撤销 + 黑名单）
+- **文件**: `backend/app/user/internal/service/user_service.go`, `backend/app/user/internal/data/session.go`, `backend/pkg/redis/*`
+- **操作**: Logout 按当前 `sid` 撤销会话并写入 Redis 黑名单（`sid/jti`），同时按同 Path 清除 refresh cookie
+- **测试**: 登出后同 access token 立即访问受保护 API 返回 401；并验证仅当前设备失效
+- **验收**: 登出无需等待 access token 自然过期即可失效
+
+#### T2.1.3d JWT 黑名单校验中间件
+- **文件**: `backend/pkg/middleware/auth.go`, `backend/pkg/middleware/auth_blacklist.go`
+- **操作**: JWT 验签后增加 claims 严格校验（`iss/aud/sid/jti/token_type`）与 Redis 黑名单校验（`sid/jti` 任一命中即拒绝）
+- **测试**: sid 命中/jti 命中/未命中三类路径；`iss/aud` 不匹配拒绝；Redis 异常场景行为验证
+- **验收**: 黑名单策略在所有受保护接口统一生效
+
+#### T2.1.3e 黑名单故障策略与会话回查兜底
+- **文件**: `backend/pkg/middleware/auth.go`, `backend/app/user/internal/data/session.go`
+- **操作**: 实现黑名单检查 fail-closed 默认策略；受控降级模式下通过 `sid -> sessions.revoked_at` 回查兜底
+- **测试**: Redis 不可用、黑名单丢失重启、受控降级开关三类场景
+- **验收**: 不可出现“已登出 token 在故障窗口被静默放行”
+
+#### T2.1.3f 登出全部设备 API 合约
+- **文件**: `backend/api/user/v1/user.proto`, `backend/app/user/internal/service/user_service.go`
+- **操作**: 新增 `LogoutAll` 接口（`/api/v1/users/logout-all`），调用 `RevokeAllByUserID` 并写入活跃 `sid` 黑名单
+- **测试**: 当前设备/全部设备退出语义区分，跨设备会话隔离验证
+- **验收**: 前端可显式触发“退出全部设备”
+
+#### T2.1.3g Cookie 鉴权端点 CSRF 强化（TODO）
+- **文件**: `backend/app/user/internal/server/http.go`, `backend/pkg/middleware/*`
+- **操作**: 对 `/api/v1/users/refresh`、`/api/v1/users/logout`、`/api/v1/users/logout-all` 增加 `Origin/Referer` 白名单校验与双提交 CSRF Token 校验（`X-CSRF-Token` + Cookie）
+- **测试**: 无 `Origin/Referer`、跨站 `Origin`、缺失/不匹配 CSRF Token、合法请求四类场景
+- **验收**: Cookie 鉴权写操作仅允许同源且通过 CSRF 校验的请求
+
+#### T2.1.3h 黑名单 fail-closed 运行时策略强化（TODO）
+- **文件**: `backend/app/user/internal/service/user_service.go`, `backend/pkg/middleware/auth.go`, `backend/app/user/internal/data/*`
+- **操作**: 将 Redis 黑名单依赖提升为显式策略开关；默认 fail-closed（不可用即拒绝），并补充 `sid -> sessions.revoked_at` 回查兜底路径
+- **测试**: Redis 不可用/抖动、fail-open 开关开启、回查命中/未命中四类场景
+- **验收**: 已登出 token 在 Redis 故障窗口内不会被静默放行
+
 #### T2.1.4 登录锁定
 - **文件**: `backend/pkg/middleware/login_lockout.go`
 - **操作**: 使用 Redis TTL 计数实现“5次失败后锁定15分钟”
@@ -497,8 +545,13 @@
 
 ### T3.2 JWT 插件配置
 - **文件**: `deployments/apisix/apisix.yaml`
-- **操作**: 与 user-service 对齐 secret/issuer
+- **操作**: 与 user-service 对齐 secret/issuer，并将受保护 HTTP API 收敛为 `Authorization` Header 鉴权（禁用 query token 主链路）
 - **验收**: JWT 验证通过
+
+### T3.2a 服务侧 JWT/黑名单中间件接入
+- **文件**: `backend/app/*/internal/server/http.go`, `backend/pkg/middleware/auth.go`
+- **操作**: 在 user/character/conversation/billing/memory 等受保护服务接入 JWT 中间件，启用 claims 严格校验与黑名单检查，确保网关后端双保险
+- **验收**: 网关绕过演练场景下服务仍能拒绝无效/撤销 token
 
 ### T3.3 限流配置
 - **文件**: `deployments/apisix/apisix.yaml`
@@ -512,7 +565,7 @@
 
 ### T3.5 APISIX CORS 白名单配置
 - **文件**: `deployments/apisix/apisix.yaml`, `deployments/*/.env*`
-- **操作**: 为前端 SPA 配置按环境区分的 Origin 白名单、允许方法/头与凭据策略
+- **操作**: 为前端 SPA 配置按环境区分的 Origin 白名单、允许方法/头与凭据策略；禁止 `allow_origins=*` 与 `allow_credential=true` 组合
 - **验收**: 浏览器跨域请求正常，通过非法 Origin 拒绝测试
 
 ### T3.6 LiteLLM 网关接入配置
@@ -556,9 +609,9 @@
 
 #### T4.1.2 JWT 拦截器
 - **文件**: `frontend/src/services/api.ts`
-- **操作**: 自动附加 Token，401 自动登出，token refresh
-- **测试**: 过期 token 自动登出、refresh 续期
-- **验收**: 认证流程正常
+- **操作**: access token 仅保存在内存并自动附加 `Authorization`；401 时调用 refresh（依赖 HttpOnly Cookie）并重放请求，失败则登出；对 refresh/logout 请求附加 CSRF 头
+- **测试**: 不写入 localStorage/sessionStorage、页面刷新后静默 refresh、refresh 失败自动登出、缺失 CSRF 头请求被拒绝
+- **验收**: 认证流程正常且满足“access header + refresh cookie”安全策略
 
 #### T4.1.3 AuthContext 对接真实 API
 - **文件**: `frontend/src/context/AuthContext.tsx`
@@ -577,9 +630,10 @@
 - **文件**: `frontend/src/services/websocket.ts`
 - **操作**:
   - useChatSocket hook
-  - JWT 鉴权（连接参数）
+  - JWT 鉴权（首条 AUTH 消息或 Sec-WebSocket-Protocol，不走 query token）
   - 心跳检测
   - 指数退避重连（1s, 2s, 4s, 8s, max 30s）
+  - 处理服务端 `SESSION_REVOKED` 事件并主动清理本地认证态
   - 消息事件 → queryClient.invalidateQueries
 - **测试**: 连接状态管理、断线重连
 - **验收**: 多端同步正常
@@ -672,6 +726,26 @@
 - **文件**: `tests/integration/auth_test.go`
 - **操作**: 注册 → 登录 → 获取 JWT → 调用受保护 API
 - **验收**: 全链路通过
+
+#### T5.2.1a 登出立即失效与黑名单校验
+- **文件**: `tests/integration/auth_logout_blacklist_test.go`
+- **操作**: 登录后调用受保护 API 成功 → 执行 logout → 复用同一 access token 再请求应立即 401；验证 refresh cookie 清除与当前 `sid` 被拒绝
+- **验收**: “退出当前设备”即时失效，且不影响同用户其他活跃设备会话
+
+#### T5.2.1b 退出全部设备与跨端踢线
+- **文件**: `tests/integration/auth_logout_all_test.go`, `tests/integration/ws_session_revoked_test.go`
+- **操作**: 登录两个设备并建立 WS；调用 logout-all 后验证两个设备 API 均 401 且 WS 连接被服务端主动关闭
+- **验收**: `logout-all` 语义完整，撤销后无残留活跃连接
+
+#### T5.2.1c 黑名单依赖故障演练
+- **文件**: `tests/integration/auth_blacklist_failure_mode_test.go`
+- **操作**: 注入 Redis 不可用/重启场景，验证默认 fail-closed；受控降级开关开启时验证 `sessions.revoked_at` 回查兜底
+- **验收**: 故障窗口不出现已撤销 token 放行
+
+#### T5.2.1d Refresh/Logout CSRF 防护测试
+- **文件**: `tests/integration/auth_csrf_test.go`
+- **操作**: 对 refresh/logout/logout-all 分别验证“无 CSRF 头被拒绝、合法 CSRF 头通过”
+- **验收**: Cookie 鉴权写操作具备可验证的 CSRF 保护
 
 #### T5.2.2 发送消息→扣费→回复 全链路
 - **文件**: `tests/integration/conversation_test.go`

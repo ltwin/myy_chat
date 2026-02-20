@@ -14,6 +14,18 @@ Frontend request pipeline MUST attach JWT to authenticated API requests and hand
 - **WHEN** backend returns unauthorized response for an authenticated request
 - **THEN** client MUST clear invalid session or perform refresh flow according to configured auth policy
 
+#### Scenario: Access token is memory-only
+- **WHEN** user completes login and obtains a valid access token
+- **THEN** frontend MUST keep access token only in runtime memory and MUST NOT persist it into `localStorage` or `sessionStorage`
+
+#### Scenario: Refresh flow relies on HttpOnly cookie
+- **WHEN** frontend needs to refresh an expired access token
+- **THEN** client MUST call refresh API without reading refresh token from JavaScript, and rely on browser-attached HttpOnly cookie for refresh authentication
+
+#### Scenario: CSRF token is attached for cookie-auth write endpoints
+- **WHEN** frontend calls refresh/logout/logout-all endpoints that depend on cookie authentication
+- **THEN** request MUST include configured CSRF protection signal (for example `X-CSRF-Token`) according to backend policy
+
 ### Requirement: Streaming Chat Rendering Feedback
 Chat UI MUST render assistant output incrementally and present explicit loading/timeout states.
 
@@ -38,4 +50,3 @@ Frontend MUST expose a memory list view that displays stored user memory summari
 #### Scenario: Memory list renders backend results
 - **WHEN** memory API returns records for current user context
 - **THEN** MemoryList UI MUST render those records and handle empty-state presentation
-

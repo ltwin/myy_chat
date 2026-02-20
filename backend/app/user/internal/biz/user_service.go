@@ -194,6 +194,102 @@ func (s *UserService) Login(ctx context.Context, input LoginInput) (*LoginOutput
 	}, nil
 }
 
+// IssueSessionOutput 创建会话输出
+type IssueSessionOutput struct {
+	Session      *Session
+	RefreshToken string
+}
+
+// IssueSession 创建服务端会话并发放 refresh token（明文仅返回给调用方）
+func (s *UserService) IssueSession(ctx context.Context, userID int64, userAgent, ipAddress string) (*IssueSessionOutput, error) {
+	sessionID := s.idGen.Generate()
+	session, refreshToken, err := NewSession(sessionID, userID, userAgent, ipAddress, DefaultSessionConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.sessionRepo.Create(ctx, session); err != nil {
+		return nil, err
+	}
+
+	return &IssueSessionOutput{
+		Session:      session,
+		RefreshToken: refreshToken,
+	}, nil
+}
+
+// RefreshSessionOutput 刷新会话输出
+type RefreshSessionOutput struct {
+	User         *User
+	Session      *Session
+	RefreshToken string
+}
+
+// RefreshSession 通过 refresh token 刷新会话并执行 token rotation
+func (s *UserService) RefreshSession(ctx context.Context, refreshToken string) (*RefreshSessionOutput, error) {
+	if refreshToken == "" {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	session, err := s.sessionRepo.GetByRefreshTokenHash(ctx, HashRefreshToken(refreshToken))
+	if err != nil {
+		// 对外统一返回无效 refresh token，避免会话枚举。
+		if err == ErrSessionExpired {
+			return nil, ErrInvalidRefreshToken
+		}
+		return nil, err
+	}
+
+	if !session.VerifyRefreshToken(refreshToken) {
+		return nil, ErrInvalidRefreshToken
+	}
+	if session.IsRevoked() {
+		return nil, ErrSessionRevoked
+	}
+	if session.IsExpired() {
+		return nil, ErrSessionExpired
+	}
+
+	user, err := s.userRepo.GetByID(ctx, session.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	newRefreshToken, err := session.RotateRefreshToken(DefaultSessionConfig.RefreshTokenTTL)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.sessionRepo.Update(ctx, session); err != nil {
+		return nil, err
+	}
+
+	return &RefreshSessionOutput{
+		User:         user,
+		Session:      session,
+		RefreshToken: newRefreshToken,
+	}, nil
+}
+
+// RevokeSession 撤销指定会话（当前设备登出）
+func (s *UserService) RevokeSession(ctx context.Context, sessionID int64) error {
+	if sessionID <= 0 {
+		return ErrInvalidRefreshToken
+	}
+	return s.sessionRepo.Revoke(ctx, sessionID)
+}
+
+// RevokeAllSessions 撤销用户所有活跃会话（全部设备登出）
+func (s *UserService) RevokeAllSessions(ctx context.Context, userID int64) ([]*Session, error) {
+	sessions, err := s.sessionRepo.ListByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.sessionRepo.RevokeAllByUserID(ctx, userID); err != nil {
+		return nil, err
+	}
+	return sessions, nil
+}
+
 // GetUser 获取用户信息
 func (s *UserService) GetUser(ctx context.Context, userID int64) (*User, error) {
 	user, err := s.userRepo.GetByID(ctx, userID)

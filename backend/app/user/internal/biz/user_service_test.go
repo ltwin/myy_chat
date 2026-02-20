@@ -200,6 +200,11 @@ func (r *mockSessionRepo) GetByID(ctx context.Context, id int64) (*Session, erro
 }
 
 func (r *mockSessionRepo) GetByRefreshTokenHash(ctx context.Context, hash string) (*Session, error) {
+	for _, session := range r.sessions {
+		if session.RefreshTokenHash == hash {
+			return session, nil
+		}
+	}
 	return nil, ErrSessionExpired
 }
 
@@ -217,6 +222,11 @@ func (r *mockSessionRepo) Revoke(ctx context.Context, id int64) error {
 }
 
 func (r *mockSessionRepo) RevokeAllByUserID(ctx context.Context, userID int64) error {
+	for _, session := range r.sessions {
+		if session.UserID == userID && !session.IsRevoked() {
+			session.Revoke()
+		}
+	}
 	return nil
 }
 
@@ -225,7 +235,13 @@ func (r *mockSessionRepo) DeleteExpired(ctx context.Context) (int64, error) {
 }
 
 func (r *mockSessionRepo) ListByUserID(ctx context.Context, userID int64) ([]*Session, error) {
-	return nil, nil
+	sessions := make([]*Session, 0)
+	for _, session := range r.sessions {
+		if session.UserID == userID && !session.IsRevoked() && !session.IsExpired() {
+			sessions = append(sessions, session)
+		}
+	}
+	return sessions, nil
 }
 
 // mockIDGen 模拟ID生成器
@@ -469,5 +485,90 @@ func TestUserService_UpdatePassword(t *testing.T) {
 	})
 	if err != nil {
 		t.Error("login with new password should succeed")
+	}
+}
+
+func TestUserService_RefreshSession(t *testing.T) {
+	userRepo := newMockUserRepo()
+	profileRepo := newMockProfileRepo()
+	creditRepo := newMockCreditRepo()
+	sessionRepo := newMockSessionRepo()
+	idGen := &mockIDGen{}
+
+	service := NewUserService(userRepo, profileRepo, creditRepo, sessionRepo, idGen, log.DefaultLogger)
+	ctx := context.Background()
+
+	output, err := service.Register(ctx, RegisterInput{
+		Username: "testuser",
+		Email:    "test@example.com",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+
+	issued, err := service.IssueSession(ctx, output.User.ID, "ua", "127.0.0.1")
+	if err != nil {
+		t.Fatalf("issue session failed: %v", err)
+	}
+
+	refreshed, err := service.RefreshSession(ctx, issued.RefreshToken)
+	if err != nil {
+		t.Fatalf("refresh session failed: %v", err)
+	}
+	if refreshed.User.ID != output.User.ID {
+		t.Fatalf("refresh returned wrong user: got %d want %d", refreshed.User.ID, output.User.ID)
+	}
+	if refreshed.RefreshToken == "" {
+		t.Fatal("expected non-empty rotated refresh token")
+	}
+	if refreshed.RefreshToken == issued.RefreshToken {
+		t.Fatal("refresh token should be rotated")
+	}
+
+	// 旧 refresh token 不可重放
+	_, err = service.RefreshSession(ctx, issued.RefreshToken)
+	if err != ErrInvalidRefreshToken {
+		t.Fatalf("expected ErrInvalidRefreshToken, got %v", err)
+	}
+}
+
+func TestUserService_RevokeAllSessions(t *testing.T) {
+	userRepo := newMockUserRepo()
+	profileRepo := newMockProfileRepo()
+	creditRepo := newMockCreditRepo()
+	sessionRepo := newMockSessionRepo()
+	idGen := &mockIDGen{}
+
+	service := NewUserService(userRepo, profileRepo, creditRepo, sessionRepo, idGen, log.DefaultLogger)
+	ctx := context.Background()
+
+	output, err := service.Register(ctx, RegisterInput{
+		Username: "testuser",
+		Email:    "test@example.com",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+
+	if _, err := service.IssueSession(ctx, output.User.ID, "ua-1", "127.0.0.1"); err != nil {
+		t.Fatalf("issue session #1 failed: %v", err)
+	}
+	if _, err := service.IssueSession(ctx, output.User.ID, "ua-2", "127.0.0.1"); err != nil {
+		t.Fatalf("issue session #2 failed: %v", err)
+	}
+
+	sessions, err := service.RevokeAllSessions(ctx, output.User.ID)
+	if err != nil {
+		t.Fatalf("revoke all sessions failed: %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("expected 2 active sessions before revocation, got %d", len(sessions))
+	}
+	for _, session := range sessions {
+		if !session.IsRevoked() {
+			t.Fatalf("expected session %d to be revoked", session.ID)
+		}
 	}
 }

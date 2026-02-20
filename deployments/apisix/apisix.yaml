@@ -139,7 +139,8 @@ global_rules:
     plugins:
       # CORS 跨域配置
       cors:
-        allow_origins: "*"
+        # 注意：携带凭据时禁止使用 "*"；生产环境需改为环境级白名单
+        allow_origins: "http://localhost:5173,http://127.0.0.1:5173"
         allow_methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
         allow_headers: "Content-Type, Authorization, X-Request-ID"
         expose_headers: "X-Request-ID"
@@ -210,6 +211,34 @@ routes:
         key_type: var
         key: remote_addr
 
+  # 用户登出（当前设备）- 需要认证
+  - id: user-logout
+    uri: /api/v1/users/logout
+    methods: ["POST"]
+    upstream_id: user-service
+    plugins:
+      jwt-auth:
+        header: Authorization
+      limit-req:
+        rate: 30
+        burst: 15
+        key_type: var
+        key: consumer_name
+
+  # 用户登出（全部设备）- 需要认证
+  - id: user-logout-all
+    uri: /api/v1/users/logout-all
+    methods: ["POST"]
+    upstream_id: user-service
+    plugins:
+      jwt-auth:
+        header: Authorization
+      limit-req:
+        rate: 20
+        burst: 10
+        key_type: var
+        key: consumer_name
+
   # 公开角色列表
   - id: public-characters
     uri: /api/v1/characters/public
@@ -234,8 +263,6 @@ routes:
     plugins:
       jwt-auth:
         header: Authorization
-        query: token
-        cookie: jwt
       limit-req:
         rate: 60
         burst: 30
@@ -258,8 +285,6 @@ routes:
     plugins:
       jwt-auth:
         header: Authorization
-        query: token
-        cookie: jwt
       limit-req:
         rate: 60
         burst: 30
@@ -282,8 +307,6 @@ routes:
     plugins:
       jwt-auth:
         header: Authorization
-        query: token
-        cookie: jwt
       limit-req:
         rate: 30
         burst: 15
@@ -306,8 +329,6 @@ routes:
     plugins:
       jwt-auth:
         header: Authorization
-        query: token
-        cookie: jwt
       limit-req:
         rate: 10
         burst: 5
@@ -330,8 +351,6 @@ routes:
     plugins:
       jwt-auth:
         header: Authorization
-        query: token
-        cookie: jwt
       limit-req:
         rate: 30
         burst: 15
@@ -354,8 +373,6 @@ routes:
     plugins:
       jwt-auth:
         header: Authorization
-        query: token
-        cookie: jwt
       limit-req:
         rate: 30
         burst: 15
@@ -390,8 +407,6 @@ routes:
     plugins:
       jwt-auth:
         header: Authorization
-        query: token
-        cookie: jwt
       limit-req:
         rate: 5
         burst: 2
