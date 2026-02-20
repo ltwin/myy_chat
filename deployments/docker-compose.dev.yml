@@ -180,12 +180,12 @@ services:
       retries: 3
 
   # ============================================
-  # Golang 微服务
+  # Go 微服务
   # ============================================
 
   user-service:
     build:
-      context: ../backend/golang
+      context: ../backend
       dockerfile: app/user/Dockerfile
     container_name: myy-chat-user-service
     restart: unless-stopped
@@ -215,7 +215,7 @@ services:
 
   character-service:
     build:
-      context: ../backend/golang
+      context: ../backend
       dockerfile: app/character/Dockerfile
     container_name: myy-chat-character-service
     restart: unless-stopped
@@ -244,7 +244,7 @@ services:
 
   conversation-service:
     build:
-      context: ../backend/golang
+      context: ../backend
       dockerfile: app/conversation/Dockerfile
     container_name: myy-chat-conversation-service
     restart: unless-stopped
@@ -273,7 +273,7 @@ services:
 
   memory-service:
     build:
-      context: ../backend/golang
+      context: ../backend
       dockerfile: app/memory/Dockerfile
     container_name: myy-chat-memory-service
     restart: unless-stopped
@@ -302,7 +302,7 @@ services:
 
   billing-service:
     build:
-      context: ../backend/golang
+      context: ../backend
       dockerfile: app/billing/Dockerfile
     container_name: myy-chat-billing-service
     restart: unless-stopped
@@ -334,12 +334,12 @@ services:
       retries: 3
 
   # ============================================
-  # Python 微服务
+  # Go 微服务 (Agent)
   # ============================================
 
   llm-agent-service:
     build:
-      context: ../backend/golang
+      context: ../backend
       dockerfile: app/llm_agent/Dockerfile
     container_name: myy-chat-llm-agent-service
     restart: unless-stopped
@@ -355,40 +355,6 @@ services:
       litellm:
         condition: service_healthy
       redis:
-        condition: service_healthy
-    networks:
-      - myy-chat-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  memory-processor:
-    build:
-      context: ../backend/python/memory-processor
-      dockerfile: Dockerfile
-    container_name: myy-chat-memory-processor
-    restart: unless-stopped
-    environment:
-      MEMORY_PROC_HTTP_PORT: 8000
-      MEMORY_PROC_GRPC_PORT: 9000
-      LITELLM_PROXY_URL: http://litellm:4000
-      LITELLM_API_KEY: ${LITELLM_MASTER_KEY:-sk-myy-chat-dev-key}
-      REDIS_URL: redis://redis:6379
-      DATABASE_URL: postgresql://${POSTGRES_USER:-myy_chat_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-myy_chat}
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: neo4j
-      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-change_me_in_production}
-    ports:
-      - "8007:8000"
-      - "9007:9000"
-    depends_on:
-      litellm:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
         condition: service_healthy
     networks:
       - myy-chat-network

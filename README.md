@@ -74,19 +74,18 @@ MyY Chat 是一个现代化的 AI 角色对话平台,支持用户与个性化的
 
 ```
 myy_chat/
-├── backend/
-│   ├── golang/              # 7个Go微服务
-│   │   ├── user-service/
-│   │   ├── character-service/
-│   │   ├── conversation-service/
-│   │   ├── memory-service/
-│   │   ├── billing-service/
-│   │   ├── admin-service/
-│   │   └── analytics-service/
-│   └── python/              # 3个Python服务
-│       ├── llm-service/
-│       ├── memory-processor/
-│       └── compression-service/
+├── backend/                 # Go 后端大仓（含所有微服务）
+│   ├── api/
+│   ├── app/
+│   │   ├── user/
+│   │   ├── character/
+│   │   ├── conversation/
+│   │   ├── memory/
+│   │   ├── billing/
+│   │   └── llm_agent/
+│   ├── migrations/
+│   ├── pkg/
+│   └── Makefile
 ├── frontend/                # Next.js 14应用
 ├── proto/                   # 共享Protobuf定义
 ├── deployments/             # Docker Compose + K8s配置
@@ -101,7 +100,6 @@ myy_chat/
 
 - **Docker** 24+ 和 **Docker Compose** 2.x
 - **Go** 1.21+ (本地开发)
-- **Python** 3.11+ (本地开发)
 - **Node.js** 20 LTS (前端开发)
 - **protoc** (Protobuf编译器)
 
@@ -158,15 +156,12 @@ docker-compose up -d postgres redis
 cd ../scripts
 ./migrate.sh up
 
-# 启动user-service
-cd ../backend/golang/user-service
-go mod download
-go run cmd/main.go
+# 启动 user-service
+cd ../backend
+make run-user
 
-# 启动llm-service
-cd ../../python/llm-service
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8061
+# 启动 llm-agent-service（Go）
+make run-llm_agent
 ```
 
 #### 前端
@@ -191,13 +186,9 @@ npm run dev
 ### 运行单元测试
 
 ```bash
-# Golang服务
-cd backend/golang/user-service
-go test -v -cover ./...
-
-# Python服务
-cd backend/python/llm-service
-pytest --cov=. --cov-report=term
+# Backend (Go)
+cd backend
+make test
 
 # Frontend
 cd frontend
@@ -210,7 +201,7 @@ npm run test
 
 ```bash
 # 查看覆盖率报告
-cd backend/golang/user-service
+cd backend
 go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out -o coverage.html
 ```
@@ -220,7 +211,7 @@ go tool cover -html=coverage.out -o coverage.html
 ### 代码风格
 
 - **Golang**: 中文注释 + 英文日志,遵循 `golangci-lint` 规范
-- **Python**: 中文注释 + 英文日志,遵循 `ruff` 和 `black` 规范
+- **Backend (Go)**: 中文注释 + 英文日志,遵循 `golangci-lint` 规范
 - **TypeScript**: ESLint + Prettier
 
 ### Pre-commit Hooks

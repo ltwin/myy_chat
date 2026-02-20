@@ -1,6 +1,6 @@
 # Admin Service Dockerfile (大仓模式)
 # 构建: docker build -t myy-chat-admin -f app/admin/Dockerfile .
-# 注意: 需要在 backend/golang/ 目录下执行构建
+# 注意: 需要在 backend/ 目录下执行构建
 
 # ============================================
 # 构建阶段

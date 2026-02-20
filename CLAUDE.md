@@ -36,7 +36,7 @@ myy_chat/
 │       ├── types/             # TypeScript 类型
 │       └── lib/               # 工具函数
 │
-├── backend/golang/             # Go 微服务后端 (Kratos v2)
+├── backend/                    # Go 微服务后端 (Kratos v2)
 │   ├── api/                   # Proto 定义（服务间共享）
 │   │   ├── user/v1/          # 用户服务 API
 │   │   ├── character/v1/     # 角色服务 API
@@ -71,7 +71,7 @@ npm run preview    # 预览生产构建
 
 ### Backend (Root Makefile)
 ```bash
-cd backend/golang
+cd backend
 
 # 初始化
 make init           # 安装依赖工具

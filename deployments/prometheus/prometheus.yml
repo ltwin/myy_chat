@@ -37,15 +37,10 @@ scrape_configs:
       - targets: ['billing-service:8000']
     metrics_path: /metrics
 
-  # Python 微服务
+  # Go Agent 服务
   - job_name: 'llm-agent-service'
     static_configs:
       - targets: ['llm-agent-service:8000']
-    metrics_path: /metrics
-
-  - job_name: 'memory-processor'
-    static_configs:
-      - targets: ['memory-processor:8000']
     metrics_path: /metrics
 
   # LiteLLM Proxy

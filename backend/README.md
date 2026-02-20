@@ -5,7 +5,7 @@
 ## 目录结构
 
 ```
-backend/golang/
+backend/
 ├── Makefile              # 根 Makefile (统一管理所有服务)
 ├── go.mod                # 共享的 Go 模块
 ├── api/                  # 统一的 API proto 定义
@@ -277,6 +277,6 @@ make setup
 
 ## 下一步
 
-1. 查看 [开发文档](../../docs/development.md) 了解详细开发规范
+1. 查看 [`docs/development.md`](../docs/development.md) 了解详细开发规范
 2. 阅读 [项目规范](../../specs/001-ai-companion-platform/) 了解业务需求
 3. 开始实现你的第一个服务！

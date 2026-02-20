@@ -127,40 +127,10 @@ openapi:
 		$(API_PROTO_FILES)
 	@echo "✓ OpenAPI 文档生成完成: openapi.yaml"
 
-# Python 服务列表 (需要生成 Python gRPC 代码)
-PYTHON_SERVICES = user conversation memory character billing
-
-.PHONY: proto-python
-# 生成 Python gRPC 代码
-proto-python:
-	@echo ">>> 生成 Python gRPC 代码..."
-	@mkdir -p ../python/proto
-	@for svc in $(PYTHON_SERVICES); do \
-		echo "  - 生成 $$svc Python proto..."; \
-		if [ -d api/$$svc/v1 ]; then \
-			python3 -m grpc_tools.protoc \
-				--proto_path=./api \
-				--proto_path=./third_party \
-				--python_out=../python/proto \
-				--grpc_python_out=../python/proto \
-				--pyi_out=../python/proto \
-				api/$$svc/v1/*.proto; \
-		fi; \
-	done
-	@echo "  - 创建 __init__.py 文件..."
-	@touch ../python/proto/__init__.py
-	@for svc in $(PYTHON_SERVICES); do \
-		if [ -d ../python/proto/$$svc ]; then \
-			touch ../python/proto/$$svc/__init__.py; \
-			touch ../python/proto/$$svc/v1/__init__.py; \
-		fi; \
-	done
-	@echo "✓ Python gRPC 代码生成完成!"
-
 .PHONY: proto-all
-# 生成所有语言的 proto 代码
-proto-all: proto proto-python
-	@echo "✓ 所有语言的 Proto 代码生成完成!"
+# 生成所有协议代码 (当前仅 Go)
+proto-all: proto
+	@echo "✓ Proto 代码生成完成!"
 
 .PHONY: errors
 # 生成 Kratos errors 定义

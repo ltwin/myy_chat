@@ -136,7 +136,7 @@ Core business operations:
 
 Run unit tests:
 ```bash
-cd backend/golang
+cd backend
 make test-conversation
 ```
 
@@ -179,7 +179,7 @@ data:
 ### Running Locally
 
 ```bash
-cd backend/golang
+cd backend
 make run-conversation
 ```
 
@@ -269,7 +269,7 @@ type CreditService interface {
 
 ## Migration
 
-Migrations are located in `/backend/golang/migrations/`:
+Migrations are located in `/backend/migrations/`:
 - `000_init.sql` - Database initialization (functions, extensions)
 - `004_create_conversations_table.sql` - Conversations table + partitions
 - `005_create_messages_table.sql` - Messages table + partitions
