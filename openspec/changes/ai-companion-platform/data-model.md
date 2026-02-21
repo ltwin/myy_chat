@@ -765,7 +765,7 @@ CREATE TABLE system_configs (
 | `004_create_conversations_table.sql` | conversations | 月分区 |
 | `005_create_messages_table.sql` | messages | 月分区 |
 | `006_seed_characters.sql` | 预设角色种子数据 | `ON CONFLICT` 幂等 |
-| `007_billing_reserve_settle.sql` | credit_accounts/credit_transactions 扩展 | 预扣-结算-释放 |
+| `007_auth_and_credit_hardening.sql` + `008_messages_client_message_id.sql` | credit_accounts/credit_transactions 扩展 | 预扣-结算-释放（含兼容字段与索引） |
 | `008_messages_client_message_id.sql` | `message_dedup_keys` + `outbox_events` + messages 索引 | 全局幂等主路径 + 异步可靠投递 |
 | `009_long_term_memory_core.sql` | 6 张长期记忆子表 + 关系时态字段 | Layer1~5 + `valid_from/valid_until` |
 | `010_memory_extensions.sql` | memories / memory_claims / memory_claim_conflicts / memory_audit_events 扩展 | 优先级、可见性、冲突状态机、画像分级与职业时态、claim 幂等唯一约束、审计 |

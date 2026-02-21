@@ -130,13 +130,17 @@ func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount
 	// 创建交易记录
 	transactionID := r.idGen.Generate()
 	insertQuery := `
-		INSERT INTO credit_transactions (id, user_id, type, amount, balance_after, description, reference_type, reference_id, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+		INSERT INTO credit_transactions (
+			id, user_id, type, transaction_type, amount, balance_after,
+			description, reference_type, reference_id, status, created_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'SUCCESS', NOW())
 	`
 	_, err = tx.Exec(ctx, insertQuery,
 		transactionID,
 		userID,
 		biz.TransactionTypeBonus,
+		"GRANT",
 		amount,
 		balanceAfter,
 		reason,
@@ -200,8 +204,11 @@ func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amo
 	// 创建交易记录
 	transactionID := r.idGen.Generate()
 	insertQuery := `
-		INSERT INTO credit_transactions (id, user_id, type, amount, balance_after, description, reference_type, reference_id, idempotency_key, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+		INSERT INTO credit_transactions (
+			id, user_id, type, transaction_type, amount, balance_after,
+			description, reference_type, reference_id, idempotency_key, status, created_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'SUCCESS', NOW())
 	`
 	var idempKey sql.NullString
 	if idempotencyKey != "" {
@@ -211,6 +218,7 @@ func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amo
 		transactionID,
 		userID,
 		biz.TransactionTypeConsume,
+		"SETTLE",
 		-amount, // 消费记为负数
 		balanceAfter,
 		reason,
@@ -237,7 +245,17 @@ func (r *creditAccountRepo) GetTransactions(ctx context.Context, userID int64, l
 
 	// 获取记录
 	query := `
-		SELECT id, user_id, type, amount, balance_after, description, reference_type, reference_id, idempotency_key, created_at
+		SELECT
+			id,
+			user_id,
+			COALESCE(type, lower(transaction_type)) AS type,
+			amount,
+			balance_after,
+			description,
+			reference_type,
+			reference_id,
+			idempotency_key,
+			created_at
 		FROM credit_transactions
 		WHERE user_id = $1
 		ORDER BY created_at DESC

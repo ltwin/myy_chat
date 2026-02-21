@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/jackc/pgx/v5"
@@ -30,9 +32,15 @@ func NewMessageRepo(data *Data, logger log.Logger) biz.MessageRepo {
 
 // Create 创建消息
 func (r *messageRepo) Create(ctx context.Context, message *biz.Message) error {
-	query := `
-		INSERT INTO messages (id, conversation_id, role, content, token_count, metadata, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	insertMessageQuery := `
+		INSERT INTO messages (id, conversation_id, client_message_id, role, content, token_count, metadata, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
 	metadata, err := serializeMetadata(message.Metadata)
@@ -40,16 +48,30 @@ func (r *messageRepo) Create(ctx context.Context, message *biz.Message) error {
 		return err
 	}
 
-	_, err = r.db.Exec(ctx, query,
+	_, err = tx.Exec(ctx, insertMessageQuery,
 		message.ID,
 		message.ConversationID,
+		fallbackClientMessageID(message.ID),
 		string(message.Role),
 		message.Content,
 		message.TokenCount,
 		metadata,
 		message.CreatedAt,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	insertKeyQuery := `
+		INSERT INTO message_partition_keys (message_id, created_at, conversation_id, created_on)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (message_id) DO UPDATE SET created_at = EXCLUDED.created_at, conversation_id = EXCLUDED.conversation_id
+	`
+	if _, err := tx.Exec(ctx, insertKeyQuery, message.ID, message.CreatedAt, message.ConversationID, time.Now()); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 // CreateBatch 批量创建消息
@@ -66,8 +88,8 @@ func (r *messageRepo) CreateBatch(ctx context.Context, messages []*biz.Message) 
 	defer tx.Rollback(ctx)
 
 	query := `
-		INSERT INTO messages (id, conversation_id, role, content, token_count, metadata, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO messages (id, conversation_id, client_message_id, role, content, token_count, metadata, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
 	for _, message := range messages {
@@ -79,6 +101,7 @@ func (r *messageRepo) CreateBatch(ctx context.Context, messages []*biz.Message) 
 		_, err = tx.Exec(ctx, query,
 			message.ID,
 			message.ConversationID,
+			fallbackClientMessageID(message.ID),
 			string(message.Role),
 			message.Content,
 			message.TokenCount,
@@ -88,6 +111,15 @@ func (r *messageRepo) CreateBatch(ctx context.Context, messages []*biz.Message) 
 		if err != nil {
 			return err
 		}
+
+		insertKeyQuery := `
+			INSERT INTO message_partition_keys (message_id, created_at, conversation_id, created_on)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (message_id) DO UPDATE SET created_at = EXCLUDED.created_at, conversation_id = EXCLUDED.conversation_id
+		`
+		if _, err := tx.Exec(ctx, insertKeyQuery, message.ID, message.CreatedAt, message.ConversationID, time.Now()); err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit(ctx)
@@ -95,12 +127,17 @@ func (r *messageRepo) CreateBatch(ctx context.Context, messages []*biz.Message) 
 
 // GetByID 根据ID获取消息
 func (r *messageRepo) GetByID(ctx context.Context, id int64) (*biz.Message, error) {
+	createdAt, err := r.lookupMessageCreatedAt(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
 	query := `
 		SELECT id, conversation_id, role, content, token_count, metadata, created_at
 		FROM messages
-		WHERE id = $1
+		WHERE id = $1 AND created_at = $2
 	`
-	return r.scanMessage(r.db.QueryRow(ctx, query, id))
+	return r.scanMessage(r.db.QueryRow(ctx, query, id, createdAt))
 }
 
 // ListByConversationID 列出会话的消息列表（分页，按时间倒序）
@@ -241,4 +278,20 @@ func serializeMetadata(metadata *biz.MessageMetadata) (interface{}, error) {
 	}
 
 	return jsonData, nil
+}
+
+func fallbackClientMessageID(messageID int64) string {
+	return fmt.Sprintf("legacy-%d", messageID)
+}
+
+func (r *messageRepo) lookupMessageCreatedAt(ctx context.Context, messageID int64) (time.Time, error) {
+	query := `SELECT created_at FROM message_partition_keys WHERE message_id = $1`
+	var createdAt time.Time
+	if err := r.db.QueryRow(ctx, query, messageID).Scan(&createdAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return time.Time{}, biz.ErrMessageNotFound
+		}
+		return time.Time{}, err
+	}
+	return createdAt, nil
 }

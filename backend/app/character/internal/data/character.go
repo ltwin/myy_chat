@@ -88,7 +88,7 @@ func (r *characterRepo) Update(ctx context.Context, character *biz.Character) er
 			version = $13,
 			updated_at = $14,
 			is_deleted = $15
-		WHERE id = $1
+		WHERE id = $1 AND NOT is_deleted
 	`
 	result, err := r.db.Exec(ctx, query,
 		character.ID,
@@ -120,7 +120,7 @@ func (r *characterRepo) Update(ctx context.Context, character *biz.Character) er
 
 // Delete 删除角色 (软删除)
 func (r *characterRepo) Delete(ctx context.Context, id int64) error {
-	query := `UPDATE characters SET is_deleted = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
+	query := `UPDATE characters SET is_deleted = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND NOT is_deleted`
 	result, err := r.db.Exec(ctx, query, id)
 	if err != nil {
 		return err

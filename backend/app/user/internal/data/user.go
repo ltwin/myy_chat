@@ -233,7 +233,7 @@ func (r *userRepo) Update(ctx context.Context, user *biz.User) error {
 			last_login_at = $9,
 			is_deleted = $10,
 			deletion_scheduled_at = $11
-		WHERE id = $1
+		WHERE id = $1 AND NOT is_deleted
 	`
 	result, err := r.db.Exec(ctx, query,
 		user.ID,
@@ -261,7 +261,7 @@ func (r *userRepo) Update(ctx context.Context, user *biz.User) error {
 
 // Delete 删除用户 (软删除)
 func (r *userRepo) Delete(ctx context.Context, id int64) error {
-	query := `UPDATE users SET is_deleted = true, updated_at = $2 WHERE id = $1`
+	query := `UPDATE users SET is_deleted = true, updated_at = $2 WHERE id = $1 AND NOT is_deleted`
 	result, err := r.db.Exec(ctx, query, id, time.Now())
 	if err != nil {
 		return err

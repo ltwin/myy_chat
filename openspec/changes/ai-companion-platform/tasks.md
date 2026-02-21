@@ -510,7 +510,7 @@
 > 说明：虽然编号位于 2.5 后，但实现顺序上应在 2.2~2.5 核心功能开发前完成并验收。
 
 #### T2.6.1 billing 相关表迁移
-- **文件**: `backend/migrations/007_billing_reserve_settle.sql`
+- **文件**: `backend/migrations/007_auth_and_credit_hardening.sql`（类型与认证基线） + `backend/migrations/008_messages_client_message_id.sql`（账本扩展）
 - **操作**: 在现有账本表基础上补充预扣/结算字段与索引（幂等执行，基于 T0.3 固定基线，避免与 `000-006` 冲突）
 - **验收**: `migrate up` 幂等执行通过
 
