@@ -491,6 +491,22 @@ func (s *UserService) ReleaseReservedCredits(ctx context.Context, req *pb.Releas
 	}, nil
 }
 
+// GetCreditBalance 内部积分余额查询
+func (s *UserService) GetCreditBalance(ctx context.Context, req *pb.GetCreditBalanceRequest) (*pb.GetCreditBalanceResponse, error) {
+	account, err := s.userService.GetCreditAccount(ctx, req.UserId)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &pb.GetCreditBalanceResponse{
+		UserId:          account.UserID,
+		Balance:         account.Balance,
+		ReservedBalance: account.ReservedBalance,
+		TotalRecharged:  account.TotalRecharged,
+		TotalConsumed:   account.TotalConsumed,
+		UpdatedAt:       timestamppb.New(account.UpdatedAt),
+	}, nil
+}
+
 // 辅助函数
 
 func buildTokenBlacklist(redis *redisclient.Client) *middleware.RedisTokenBlacklist {

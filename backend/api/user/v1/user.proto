@@ -153,6 +153,9 @@ service UserService {
 
   // ReleaseReservedCredits 内部预扣释放
   rpc ReleaseReservedCredits(ReleaseReservedCreditsRequest) returns (ReleaseReservedCreditsResponse);
+
+  // GetCreditBalance 内部积分余额查询
+  rpc GetCreditBalance(GetCreditBalanceRequest) returns (GetCreditBalanceResponse);
 }
 
 // ============================================
@@ -358,6 +361,19 @@ message ReleaseReservedCreditsResponse {
   bool success = 1;
   int64 balance_after = 2;
   int64 reserved_balance_after = 3;
+}
+
+message GetCreditBalanceRequest {
+  int64 user_id = 1;
+}
+
+message GetCreditBalanceResponse {
+  int64 user_id = 1;
+  int64 balance = 2;
+  int64 reserved_balance = 3;
+  int64 total_recharged = 4;
+  int64 total_consumed = 5;
+  google.protobuf.Timestamp updated_at = 6;
 }
 
 // ============================================

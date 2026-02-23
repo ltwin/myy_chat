@@ -239,7 +239,8 @@ func (s *ConversationService) SendMessage(ctx context.Context, input SendMessage
 
 	// 扣除积分
 	if llmResp.Cost > 0 {
-		if err := s.creditService.DeductCredits(ctx, input.UserID, llmResp.Cost, fmt.Sprintf("conversation:%d", input.ConversationID)); err != nil {
+		creditReason := fmt.Sprintf("conversation:%d:assistant_message:%d", input.ConversationID, assistantMessageID)
+		if err := s.creditService.DeductCredits(ctx, input.UserID, llmResp.Cost, creditReason); err != nil {
 			s.log.Errorf("failed to deduct credits: %v", err)
 			// 非致命错误，继续
 		}
