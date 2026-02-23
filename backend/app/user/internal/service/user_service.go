@@ -411,6 +411,86 @@ func (s *UserService) ResetPassword(ctx context.Context, req *pb.ResetPasswordRe
 	}, nil
 }
 
+// AddCredits 内部积分增加
+func (s *UserService) AddCredits(ctx context.Context, req *pb.AddCreditsRequest) (*pb.AddCreditsResponse, error) {
+	if err := s.userService.AddCredits(ctx, req.UserId, req.Amount, req.Reason, req.ReferenceType, req.ReferenceId, req.IdempotencyKey); err != nil {
+		return nil, toGRPCError(err)
+	}
+	balance, err := s.userService.GetCreditBalance(ctx, req.UserId)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &pb.AddCreditsResponse{
+		Success:      true,
+		BalanceAfter: balance,
+	}, nil
+}
+
+// DeductCredits 内部积分扣减
+func (s *UserService) DeductCredits(ctx context.Context, req *pb.DeductCreditsRequest) (*pb.DeductCreditsResponse, error) {
+	if err := s.userService.DeductCredits(ctx, req.UserId, req.Amount, req.Reason, req.ReferenceType, req.ReferenceId, req.IdempotencyKey); err != nil {
+		return nil, toGRPCError(err)
+	}
+	balance, err := s.userService.GetCreditBalance(ctx, req.UserId)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &pb.DeductCreditsResponse{
+		Success:      true,
+		BalanceAfter: balance,
+	}, nil
+}
+
+// ReserveCredits 内部积分预扣
+func (s *UserService) ReserveCredits(ctx context.Context, req *pb.ReserveCreditsRequest) (*pb.ReserveCreditsResponse, error) {
+	reserveID, err := s.userService.ReserveCredits(ctx, req.UserId, req.Amount, req.Reason, req.ReferenceType, req.ReferenceId, req.IdempotencyKey)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	account, err := s.userService.GetCreditAccount(ctx, req.UserId)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &pb.ReserveCreditsResponse{
+		Success:              true,
+		ReserveId:            reserveID,
+		BalanceAfter:         account.Balance,
+		ReservedBalanceAfter: account.ReservedBalance,
+	}, nil
+}
+
+// SettleReservedCredits 内部预扣结算
+func (s *UserService) SettleReservedCredits(ctx context.Context, req *pb.SettleReservedCreditsRequest) (*pb.SettleReservedCreditsResponse, error) {
+	if err := s.userService.SettleReservedCredits(ctx, req.UserId, req.ReserveId, req.Amount, req.Reason, req.ReferenceType, req.ReferenceId, req.IdempotencyKey); err != nil {
+		return nil, toGRPCError(err)
+	}
+	account, err := s.userService.GetCreditAccount(ctx, req.UserId)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &pb.SettleReservedCreditsResponse{
+		Success:              true,
+		BalanceAfter:         account.Balance,
+		ReservedBalanceAfter: account.ReservedBalance,
+	}, nil
+}
+
+// ReleaseReservedCredits 内部预扣释放
+func (s *UserService) ReleaseReservedCredits(ctx context.Context, req *pb.ReleaseReservedCreditsRequest) (*pb.ReleaseReservedCreditsResponse, error) {
+	if err := s.userService.ReleaseReservedCredits(ctx, req.UserId, req.ReserveId, req.Amount, req.Reason, req.ReferenceType, req.ReferenceId, req.IdempotencyKey); err != nil {
+		return nil, toGRPCError(err)
+	}
+	account, err := s.userService.GetCreditAccount(ctx, req.UserId)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	return &pb.ReleaseReservedCreditsResponse{
+		Success:              true,
+		BalanceAfter:         account.Balance,
+		ReservedBalanceAfter: account.ReservedBalance,
+	}, nil
+}
+
 // 辅助函数
 
 func buildTokenBlacklist(redis *redisclient.Client) *middleware.RedisTokenBlacklist {
@@ -622,6 +702,14 @@ func toGRPCError(err error) error {
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, biz.ErrInvalidRefreshToken), errors.Is(err, biz.ErrSessionExpired), errors.Is(err, biz.ErrSessionNotFound), errors.Is(err, biz.ErrSessionRevoked):
 		return status.Error(codes.Unauthenticated, err.Error())
+	case errors.Is(err, biz.ErrCreditAccountNotFound), errors.Is(err, biz.ErrReserveNotFound):
+		return status.Error(codes.NotFound, err.Error())
+	case errors.Is(err, biz.ErrInsufficientBalance), errors.Is(err, biz.ErrInsufficientReserved):
+		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, biz.ErrDuplicateTransaction):
+		return status.Error(codes.AlreadyExists, err.Error())
+	case errors.Is(err, biz.ErrInvalidCreditAmount), errors.Is(err, biz.ErrIdempotencyKeyMissing):
+		return status.Error(codes.InvalidArgument, err.Error())
 	default:
 		return status.Error(codes.Internal, "internal server error")
 	}

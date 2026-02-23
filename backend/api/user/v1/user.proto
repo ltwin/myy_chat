@@ -138,6 +138,21 @@ service UserService {
       body: "*"
     };
   }
+
+  // AddCredits 内部积分增加
+  rpc AddCredits(AddCreditsRequest) returns (AddCreditsResponse);
+
+  // DeductCredits 内部积分扣减
+  rpc DeductCredits(DeductCreditsRequest) returns (DeductCreditsResponse);
+
+  // ReserveCredits 内部积分预扣
+  rpc ReserveCredits(ReserveCreditsRequest) returns (ReserveCreditsResponse);
+
+  // SettleReservedCredits 内部预扣结算
+  rpc SettleReservedCredits(SettleReservedCreditsRequest) returns (SettleReservedCreditsResponse);
+
+  // ReleaseReservedCredits 内部预扣释放
+  rpc ReleaseReservedCredits(ReleaseReservedCreditsRequest) returns (ReleaseReservedCreditsResponse);
 }
 
 // ============================================
@@ -263,6 +278,86 @@ message ResetPasswordRequest {
 
 message ResetPasswordResponse {
   bool success = 1;
+}
+
+// ============================================
+// Internal Credit Messages
+// ============================================
+
+message AddCreditsRequest {
+  int64 user_id = 1;
+  int64 amount = 2;
+  string reason = 3;
+  string reference_type = 4;
+  string reference_id = 5;
+  string idempotency_key = 6;
+}
+
+message AddCreditsResponse {
+  bool success = 1;
+  int64 balance_after = 2;
+}
+
+message DeductCreditsRequest {
+  int64 user_id = 1;
+  int64 amount = 2;
+  string reason = 3;
+  string reference_type = 4;
+  string reference_id = 5;
+  string idempotency_key = 6;
+}
+
+message DeductCreditsResponse {
+  bool success = 1;
+  int64 balance_after = 2;
+}
+
+message ReserveCreditsRequest {
+  int64 user_id = 1;
+  int64 amount = 2;
+  string reason = 3;
+  string reference_type = 4;
+  string reference_id = 5;
+  string idempotency_key = 6;
+}
+
+message ReserveCreditsResponse {
+  bool success = 1;
+  int64 reserve_id = 2;
+  int64 balance_after = 3;
+  int64 reserved_balance_after = 4;
+}
+
+message SettleReservedCreditsRequest {
+  int64 user_id = 1;
+  int64 reserve_id = 2;
+  int64 amount = 3;
+  string reason = 4;
+  string reference_type = 5;
+  string reference_id = 6;
+  string idempotency_key = 7;
+}
+
+message SettleReservedCreditsResponse {
+  bool success = 1;
+  int64 balance_after = 2;
+  int64 reserved_balance_after = 3;
+}
+
+message ReleaseReservedCreditsRequest {
+  int64 user_id = 1;
+  int64 reserve_id = 2;
+  int64 amount = 3;
+  string reason = 4;
+  string reference_type = 5;
+  string reference_id = 6;
+  string idempotency_key = 7;
+}
+
+message ReleaseReservedCreditsResponse {
+  bool success = 1;
+  int64 balance_after = 2;
+  int64 reserved_balance_after = 3;
 }
 
 // ============================================
