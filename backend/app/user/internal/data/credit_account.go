@@ -116,8 +116,8 @@ func (r *creditAccountRepo) Update(ctx context.Context, account *biz.CreditAccou
 
 // AddCredits 增加积分 (带交易记录)
 func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) error {
-	if strings.TrimSpace(idempotencyKey) == "" {
-		return biz.ErrIdempotencyKeyMissing
+	if err := validateCreditMutationInput(amount, idempotencyKey); err != nil {
+		return err
 	}
 
 	tx, err := r.db.Begin(ctx)
@@ -126,12 +126,9 @@ func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount
 	}
 	defer tx.Rollback(ctx)
 
-	var exists bool
-	checkQuery := `SELECT EXISTS(SELECT 1 FROM credit_transactions WHERE idempotency_key = $1)`
-	if err := tx.QueryRow(ctx, checkQuery, idempotencyKey).Scan(&exists); err != nil {
+	if exists, err := transactionExistsByIdempotency(ctx, tx, idempotencyKey); err != nil {
 		return err
-	}
-	if exists {
+	} else if exists {
 		return biz.ErrDuplicateTransaction
 	}
 
@@ -184,8 +181,8 @@ func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount
 
 // DeductCredits 扣除积分 (带交易记录)
 func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) error {
-	if strings.TrimSpace(idempotencyKey) == "" {
-		return biz.ErrIdempotencyKeyMissing
+	if err := validateCreditMutationInput(amount, idempotencyKey); err != nil {
+		return err
 	}
 
 	tx, err := r.db.Begin(ctx)
@@ -194,14 +191,9 @@ func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amo
 	}
 	defer tx.Rollback(ctx)
 
-	// 检查幂等性
-	var exists bool
-	checkQuery := `SELECT EXISTS(SELECT 1 FROM credit_transactions WHERE idempotency_key = $1)`
-	err = tx.QueryRow(ctx, checkQuery, idempotencyKey).Scan(&exists)
-	if err != nil {
+	if exists, err := transactionExistsByIdempotency(ctx, tx, idempotencyKey); err != nil {
 		return err
-	}
-	if exists {
+	} else if exists {
 		return biz.ErrDuplicateTransaction
 	}
 
@@ -256,6 +248,208 @@ func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amo
 		idempotencyKey,
 	)
 	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// ReserveCredits 预扣积分 (带交易记录)，返回 reserve transaction ID
+func (r *creditAccountRepo) ReserveCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) (int64, error) {
+	if err := validateCreditMutationInput(amount, idempotencyKey); err != nil {
+		return 0, err
+	}
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+
+	if exists, err := transactionExistsByIdempotency(ctx, tx, idempotencyKey); err != nil {
+		return 0, err
+	} else if exists {
+		return 0, biz.ErrDuplicateTransaction
+	}
+
+	var balanceAfter int64
+	updateQuery := `
+		UPDATE credit_accounts
+		SET
+			balance = balance - $2,
+			reserved_balance = reserved_balance + $2,
+			version = version + 1,
+			updated_at = NOW()
+		WHERE user_id = $1 AND balance >= $2
+		RETURNING balance
+	`
+	if err := tx.QueryRow(ctx, updateQuery, userID, amount).Scan(&balanceAfter); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, resolveBalanceMutationError(ctx, tx, userID)
+		}
+		return 0, err
+	}
+
+	transactionID := r.idGen.Generate()
+	insertQuery := `
+		INSERT INTO credit_transactions (
+			id, user_id, transaction_type, amount, balance_after,
+			description, reference_type, reference_id, idempotency_key, status, created_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'SUCCESS', NOW())
+	`
+	if _, err := tx.Exec(ctx, insertQuery,
+		transactionID,
+		userID,
+		biz.TransactionTypeReserve,
+		-amount,
+		balanceAfter,
+		reason,
+		refType,
+		nullRefID(refID),
+		idempotencyKey,
+	); err != nil {
+		return 0, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return transactionID, nil
+}
+
+// SettleReservedCredits 结算预扣积分 (带交易记录)
+func (r *creditAccountRepo) SettleReservedCredits(ctx context.Context, userID, reserveID, amount int64, reason, refType, refID, idempotencyKey string) error {
+	if err := validateCreditMutationInput(amount, idempotencyKey); err != nil {
+		return err
+	}
+	if reserveID <= 0 {
+		return biz.ErrReserveNotFound
+	}
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if exists, err := transactionExistsByIdempotency(ctx, tx, idempotencyKey); err != nil {
+		return err
+	} else if exists {
+		return biz.ErrDuplicateTransaction
+	}
+
+	if err := ensureReserveTransaction(ctx, tx, userID, reserveID); err != nil {
+		return err
+	}
+
+	var balanceAfter int64
+	updateQuery := `
+		UPDATE credit_accounts
+		SET
+			reserved_balance = reserved_balance - $2,
+			total_consumed = total_consumed + $2,
+			version = version + 1,
+			updated_at = NOW()
+		WHERE user_id = $1 AND reserved_balance >= $2
+		RETURNING balance
+	`
+	if err := tx.QueryRow(ctx, updateQuery, userID, amount).Scan(&balanceAfter); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return resolveReservedMutationError(ctx, tx, userID)
+		}
+		return err
+	}
+
+	transactionID := r.idGen.Generate()
+	insertQuery := `
+		INSERT INTO credit_transactions (
+			id, user_id, transaction_type, amount, balance_after,
+			description, reference_type, reference_id, reserve_id, idempotency_key, status, created_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'SUCCESS', NOW())
+	`
+	if _, err := tx.Exec(ctx, insertQuery,
+		transactionID,
+		userID,
+		biz.TransactionTypeSettle,
+		-amount,
+		balanceAfter,
+		reason,
+		refType,
+		nullRefID(refID),
+		reserveID,
+		idempotencyKey,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// ReleaseReservedCredits 释放预扣积分 (带交易记录)
+func (r *creditAccountRepo) ReleaseReservedCredits(ctx context.Context, userID, reserveID, amount int64, reason, refType, refID, idempotencyKey string) error {
+	if err := validateCreditMutationInput(amount, idempotencyKey); err != nil {
+		return err
+	}
+	if reserveID <= 0 {
+		return biz.ErrReserveNotFound
+	}
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if exists, err := transactionExistsByIdempotency(ctx, tx, idempotencyKey); err != nil {
+		return err
+	} else if exists {
+		return biz.ErrDuplicateTransaction
+	}
+
+	if err := ensureReserveTransaction(ctx, tx, userID, reserveID); err != nil {
+		return err
+	}
+
+	var balanceAfter int64
+	updateQuery := `
+		UPDATE credit_accounts
+		SET
+			reserved_balance = reserved_balance - $2,
+			balance = balance + $2,
+			version = version + 1,
+			updated_at = NOW()
+		WHERE user_id = $1 AND reserved_balance >= $2
+		RETURNING balance
+	`
+	if err := tx.QueryRow(ctx, updateQuery, userID, amount).Scan(&balanceAfter); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return resolveReservedMutationError(ctx, tx, userID)
+		}
+		return err
+	}
+
+	transactionID := r.idGen.Generate()
+	insertQuery := `
+		INSERT INTO credit_transactions (
+			id, user_id, transaction_type, amount, balance_after,
+			description, reference_type, reference_id, reserve_id, idempotency_key, status, created_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'SUCCESS', NOW())
+	`
+	if _, err := tx.Exec(ctx, insertQuery,
+		transactionID,
+		userID,
+		biz.TransactionTypeRelease,
+		amount,
+		balanceAfter,
+		reason,
+		refType,
+		nullRefID(refID),
+		reserveID,
+		idempotencyKey,
+	); err != nil {
 		return err
 	}
 
@@ -341,6 +535,71 @@ func nullRefID(refID string) sql.NullString {
 		return sql.NullString{}
 	}
 	return sql.NullString{String: strings.TrimSpace(refID), Valid: true}
+}
+
+func validateCreditMutationInput(amount int64, idempotencyKey string) error {
+	if amount <= 0 {
+		return biz.ErrInvalidCreditAmount
+	}
+	if strings.TrimSpace(idempotencyKey) == "" {
+		return biz.ErrIdempotencyKeyMissing
+	}
+	return nil
+}
+
+func transactionExistsByIdempotency(ctx context.Context, tx pgx.Tx, idempotencyKey string) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM credit_transactions WHERE idempotency_key = $1)`
+	if err := tx.QueryRow(ctx, query, idempotencyKey).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+func ensureReserveTransaction(ctx context.Context, tx pgx.Tx, userID, reserveID int64) error {
+	var exists bool
+	query := `
+		SELECT EXISTS(
+			SELECT 1
+			FROM credit_transactions
+			WHERE id = $1
+				AND user_id = $2
+				AND transaction_type = $3
+		)
+	`
+	if err := tx.QueryRow(ctx, query, reserveID, userID, biz.TransactionTypeReserve).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return biz.ErrReserveNotFound
+	}
+	return nil
+}
+
+func resolveBalanceMutationError(ctx context.Context, tx pgx.Tx, userID int64) error {
+	var currentBalance int64
+	checkQuery := `SELECT balance FROM credit_accounts WHERE user_id = $1`
+	err := tx.QueryRow(ctx, checkQuery, userID).Scan(&currentBalance)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return biz.ErrCreditAccountNotFound
+		}
+		return err
+	}
+	return biz.ErrInsufficientBalance
+}
+
+func resolveReservedMutationError(ctx context.Context, tx pgx.Tx, userID int64) error {
+	var reservedBalance int64
+	checkQuery := `SELECT reserved_balance FROM credit_accounts WHERE user_id = $1`
+	err := tx.QueryRow(ctx, checkQuery, userID).Scan(&reservedBalance)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return biz.ErrCreditAccountNotFound
+		}
+		return err
+	}
+	return biz.ErrInsufficientReserved
 }
 
 // Delete 删除积分账户

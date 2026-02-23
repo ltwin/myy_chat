@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/jackc/pgx/v5"
@@ -140,7 +139,7 @@ func (r *userProfileRepo) Update(ctx context.Context, profile *biz.UserProfile) 
 
 	query := `
 		INSERT INTO user_profiles (user_id, full_name, gender, birth_date, location, interests, occupation, bio, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
 		ON CONFLICT (user_id) DO UPDATE SET
 			full_name = EXCLUDED.full_name,
 			gender = EXCLUDED.gender,
@@ -149,7 +148,7 @@ func (r *userProfileRepo) Update(ctx context.Context, profile *biz.UserProfile) 
 			interests = EXCLUDED.interests,
 			occupation = EXCLUDED.occupation,
 			bio = EXCLUDED.bio,
-			updated_at = EXCLUDED.updated_at
+			updated_at = NOW()
 	`
 	_, err = r.db.Exec(ctx, query,
 		profile.UserID,
@@ -160,8 +159,7 @@ func (r *userProfileRepo) Update(ctx context.Context, profile *biz.UserProfile) 
 		pq.Array(profile.Interests),
 		nullString(profile.Occupation),
 		nullString(profile.Bio),
-		time.Now(),
-		profile.UpdatedAt,
+		profile.CreatedAt,
 	)
 	return err
 }

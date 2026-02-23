@@ -24,7 +24,8 @@ var ProviderSet = wire.NewSet(
 
 // Data is the data layer wrapper.
 type Data struct {
-	db *pgxpool.Pool
+	db                      *pgxpool.Pool
+	stopPartitionMaintainer func()
 }
 
 // NewData creates a new data layer.
@@ -37,12 +38,24 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		return nil, nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
+	if err := ensureFuturePartitions(context.Background(), db, defaultPartitionMonthsAhead); err != nil {
+		db.Close()
+		return nil, nil, fmt.Errorf("failed to ensure partitions on startup: %w", err)
+	}
+	stopPartitionMaintainer := startPartitionMaintainer(db, helper, defaultPartitionEnsureInterval, defaultPartitionMonthsAhead)
+
 	cleanup := func() {
 		helper.Info("closing the data resources")
+		if stopPartitionMaintainer != nil {
+			stopPartitionMaintainer()
+		}
 		db.Close()
 	}
 
-	return &Data{db: db}, cleanup, nil
+	return &Data{
+		db:                      db,
+		stopPartitionMaintainer: stopPartitionMaintainer,
+	}, cleanup, nil
 }
 
 // NewSnowflakeGenerator 创建雪花ID生成器

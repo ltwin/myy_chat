@@ -10,9 +10,12 @@ import (
 // 积分账户相关错误
 var (
 	ErrInsufficientBalance   = errors.New("insufficient credit balance")
+	ErrInsufficientReserved  = errors.New("insufficient reserved credit balance")
 	ErrCreditAccountNotFound = errors.New("credit account not found")
 	ErrDuplicateTransaction  = errors.New("duplicate transaction")
 	ErrIdempotencyKeyMissing = errors.New("idempotency key is required")
+	ErrInvalidCreditAmount   = errors.New("credit amount must be greater than zero")
+	ErrReserveNotFound       = errors.New("reserve transaction not found")
 )
 
 // CreditAccount 积分账户实体
@@ -57,6 +60,51 @@ func (a *CreditAccount) DeductCredits(amount int64) error {
 	}
 	a.Balance -= amount
 	a.TotalConsumed += amount
+	a.Version++
+	a.UpdatedAt = time.Now()
+	return nil
+}
+
+// ReserveCredits 预扣积分（从可用余额转入预留余额）
+func (a *CreditAccount) ReserveCredits(amount int64) error {
+	if amount <= 0 {
+		return ErrInvalidCreditAmount
+	}
+	if a.Balance < amount {
+		return ErrInsufficientBalance
+	}
+	a.Balance -= amount
+	a.ReservedBalance += amount
+	a.Version++
+	a.UpdatedAt = time.Now()
+	return nil
+}
+
+// SettleReservedCredits 结算预扣积分（从预留余额转为已消费）
+func (a *CreditAccount) SettleReservedCredits(amount int64) error {
+	if amount <= 0 {
+		return ErrInvalidCreditAmount
+	}
+	if a.ReservedBalance < amount {
+		return ErrInsufficientReserved
+	}
+	a.ReservedBalance -= amount
+	a.TotalConsumed += amount
+	a.Version++
+	a.UpdatedAt = time.Now()
+	return nil
+}
+
+// ReleaseReservedCredits 释放预扣积分（从预留余额退回可用余额）
+func (a *CreditAccount) ReleaseReservedCredits(amount int64) error {
+	if amount <= 0 {
+		return ErrInvalidCreditAmount
+	}
+	if a.ReservedBalance < amount {
+		return ErrInsufficientReserved
+	}
+	a.ReservedBalance -= amount
+	a.Balance += amount
 	a.Version++
 	a.UpdatedAt = time.Now()
 	return nil
@@ -112,6 +160,12 @@ type CreditAccountRepo interface {
 	AddCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) error
 	// DeductCredits 扣除积分 (带交易记录)
 	DeductCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) error
+	// ReserveCredits 预扣积分 (带交易记录)，返回 reserve transaction ID
+	ReserveCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) (int64, error)
+	// SettleReservedCredits 结算预扣积分 (带交易记录)
+	SettleReservedCredits(ctx context.Context, userID, reserveID, amount int64, reason, refType, refID, idempotencyKey string) error
+	// ReleaseReservedCredits 释放预扣积分 (带交易记录)
+	ReleaseReservedCredits(ctx context.Context, userID, reserveID, amount int64, reason, refType, refID, idempotencyKey string) error
 	// GetTransactions 获取交易记录
 	GetTransactions(ctx context.Context, userID int64, limit, offset int) ([]*CreditTransaction, int, error)
 	// Delete 删除积分账户

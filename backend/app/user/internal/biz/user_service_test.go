@@ -131,11 +131,13 @@ func (r *mockProfileRepo) Delete(ctx context.Context, userID int64) error {
 // mockCreditRepo 模拟积分仓储
 type mockCreditRepo struct {
 	accounts map[int64]*CreditAccount
+	nextID   int64
 }
 
 func newMockCreditRepo() *mockCreditRepo {
 	return &mockCreditRepo{
 		accounts: make(map[int64]*CreditAccount),
+		nextID:   1,
 	}
 }
 
@@ -175,6 +177,50 @@ func (r *mockCreditRepo) DeductCredits(ctx context.Context, userID int64, amount
 		return account.DeductCredits(amount)
 	}
 	return ErrCreditAccountNotFound
+}
+
+func (r *mockCreditRepo) ReserveCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) (int64, error) {
+	if idempotencyKey == "" {
+		return 0, ErrIdempotencyKeyMissing
+	}
+	account, ok := r.accounts[userID]
+	if !ok {
+		return 0, ErrCreditAccountNotFound
+	}
+	if err := account.ReserveCredits(amount); err != nil {
+		return 0, err
+	}
+	id := r.nextID
+	r.nextID++
+	return id, nil
+}
+
+func (r *mockCreditRepo) SettleReservedCredits(ctx context.Context, userID, reserveID, amount int64, reason, refType, refID, idempotencyKey string) error {
+	if idempotencyKey == "" {
+		return ErrIdempotencyKeyMissing
+	}
+	if reserveID <= 0 {
+		return ErrReserveNotFound
+	}
+	account, ok := r.accounts[userID]
+	if !ok {
+		return ErrCreditAccountNotFound
+	}
+	return account.SettleReservedCredits(amount)
+}
+
+func (r *mockCreditRepo) ReleaseReservedCredits(ctx context.Context, userID, reserveID, amount int64, reason, refType, refID, idempotencyKey string) error {
+	if idempotencyKey == "" {
+		return ErrIdempotencyKeyMissing
+	}
+	if reserveID <= 0 {
+		return ErrReserveNotFound
+	}
+	account, ok := r.accounts[userID]
+	if !ok {
+		return ErrCreditAccountNotFound
+	}
+	return account.ReleaseReservedCredits(amount)
 }
 
 func (r *mockCreditRepo) GetTransactions(ctx context.Context, userID int64, limit, offset int) ([]*CreditTransaction, int, error) {

@@ -494,3 +494,18 @@ func (s *UserService) GetCreditBalance(ctx context.Context, userID int64) (int64
 	}
 	return account.Balance, nil
 }
+
+// ReserveCredits 预扣积分，返回 reserve transaction ID
+func (s *UserService) ReserveCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) (int64, error) {
+	return s.creditRepo.ReserveCredits(ctx, userID, amount, reason, refType, refID, idempotencyKey)
+}
+
+// SettleReservedCredits 结算预扣积分
+func (s *UserService) SettleReservedCredits(ctx context.Context, userID, reserveID, amount int64, reason, refType, refID, idempotencyKey string) error {
+	return s.creditRepo.SettleReservedCredits(ctx, userID, reserveID, amount, reason, refType, refID, idempotencyKey)
+}
+
+// ReleaseReservedCredits 释放预扣积分
+func (s *UserService) ReleaseReservedCredits(ctx context.Context, userID, reserveID, amount int64, reason, refType, refID, idempotencyKey string) error {
+	return s.creditRepo.ReleaseReservedCredits(ctx, userID, reserveID, amount, reason, refType, refID, idempotencyKey)
+}
