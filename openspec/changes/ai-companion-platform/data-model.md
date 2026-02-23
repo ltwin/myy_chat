@@ -191,10 +191,10 @@ erDiagram
 ```sql
 CREATE TABLE users (
     id BIGINT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    phone VARCHAR(20) UNIQUE,
+    phone VARCHAR(20),
     avatar_url TEXT,
     email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     last_login_at TIMESTAMPTZ,
@@ -208,6 +208,9 @@ CREATE TABLE users (
 CREATE INDEX idx_users_created_at ON users(created_at);
 CREATE INDEX idx_users_deletion_scheduled_at ON users(deletion_scheduled_at)
 WHERE deletion_scheduled_at IS NOT NULL;
+CREATE UNIQUE INDEX uk_users_email_lower_active ON users(lower(email)) WHERE NOT is_deleted;
+CREATE UNIQUE INDEX uk_users_username_active ON users(username) WHERE NOT is_deleted;
+CREATE UNIQUE INDEX uk_users_phone_active ON users(phone) WHERE phone IS NOT NULL AND NOT is_deleted;
 
 CREATE TABLE user_profiles (
     user_id BIGINT PRIMARY KEY,
@@ -314,6 +317,27 @@ CREATE INDEX idx_messages_conversation_time ON messages(conversation_id, created
 CREATE INDEX idx_messages_client_message_id ON messages(client_message_id);
 -- 注意：messages 分区表不承载全局 UNIQUE(client_message_id)，全局幂等由 message_dedup_keys 统一保证
 -- 查询约束：按 message id 查询时应携带 created_at（或先用 dedup/映射表定位分区）。
+
+-- 分区键映射（按 ID 精确定位分区，避免扫全分区）
+CREATE TABLE conversation_partition_keys (
+    conversation_id BIGINT PRIMARY KEY,
+    started_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_conversation_partition_keys_started_at ON conversation_partition_keys(started_at);
+
+CREATE TABLE message_partition_keys (
+    message_id BIGINT PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL,
+    conversation_id BIGINT,
+    created_on TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_message_partition_keys_created_at ON message_partition_keys(created_at);
+
+-- 服务写入约束：
+-- 1) conversation create/upsert 时必须同步写 conversation_partition_keys
+-- 2) message create/upsert 时必须同步写 message_partition_keys
+-- 3) GetByID 路径先查映射取分区键，再命中分区表主键
 
 -- 全局幂等键映射（避免分区表上全局 unique 限制）
 CREATE TABLE message_dedup_keys (
@@ -478,6 +502,8 @@ CREATE INDEX idx_memories_client_message ON memories(client_message_id)
 WHERE client_message_id IS NOT NULL;
 CREATE INDEX idx_memories_target_ref ON memories(target_table, target_id)
 WHERE target_table IS NOT NULL AND target_id IS NOT NULL;
+CREATE INDEX idx_memories_conversation_time ON memories(conversation_id, created_at DESC)
+WHERE conversation_id IS NOT NULL AND NOT is_deleted;
 CREATE INDEX idx_memories_embedding_hnsw ON memories USING hnsw (embedding vector_cosine_ops)
 WITH (m = 16, ef_construction = 64);
 
@@ -500,6 +526,7 @@ CREATE TABLE conversation_summaries (
 );
 
 CREATE INDEX idx_conversation_summaries_conv ON conversation_summaries(conversation_id, created_at DESC);
+CREATE INDEX idx_conversation_summaries_user_char_time ON conversation_summaries(user_id, character_id, created_at DESC);
 
 CREATE TABLE user_portraits (
     id BIGINT PRIMARY KEY,
@@ -522,6 +549,7 @@ CREATE TABLE user_portraits (
     CONSTRAINT chk_user_portraits_career_history CHECK (
         jsonb_typeof(career_history) = 'array'
     ),
+    CONSTRAINT chk_user_portraits_confidence CHECK (confidence_score >= 0 AND confidence_score <= 1),
     UNIQUE (user_id, character_id)
 );
 
@@ -613,6 +641,7 @@ CREATE TABLE emotional_states (
     CONSTRAINT chk_emotional_valence CHECK (valence IS NULL OR (valence >= -1 AND valence <= 1)),
     CONSTRAINT chk_emotional_arousal CHECK (arousal IS NULL OR (arousal >= 0 AND arousal <= 1)),
     CONSTRAINT chk_emotional_dominance CHECK (dominance IS NULL OR (dominance >= 0 AND dominance <= 1)),
+    CONSTRAINT chk_emotional_intensity CHECK (intensity IS NULL OR (intensity >= 0 AND intensity <= 1)),
     CONSTRAINT chk_emotional_primary_emotion CHECK (
         primary_emotion IS NULL OR primary_emotion IN ('JOY','TRUST','FEAR','SURPRISE','SADNESS','DISGUST','ANGER','ANTICIPATION','NEUTRAL')
     ),
@@ -638,6 +667,19 @@ CREATE TABLE important_events (
     metadata JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT chk_important_events_type CHECK (
+        event_type IS NULL OR event_type IN (
+            'MILESTONE',
+            'RELATIONSHIP',
+            'PREFERENCE',
+            'GOAL',
+            'PROMISE',
+            'SCHEDULE',
+            'HEALTH',
+            'WORK',
+            'OTHER'
+        )
+    ),
     CONSTRAINT chk_important_events_status CHECK (status IN ('ACTIVE','ARCHIVED','DELETED'))
 );
 
@@ -686,13 +728,18 @@ CREATE TABLE memory_graph_edges (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT chk_memory_graph_edges_sync CHECK (sync_status IN ('PENDING','SYNCED','FAILED')),
     CONSTRAINT chk_memory_graph_edges_confidence CHECK (confidence >= 0 AND confidence <= 1),
-    CONSTRAINT chk_memory_graph_edges_valid_time CHECK (valid_until IS NULL OR valid_from IS NULL OR valid_until > valid_from),
-    UNIQUE (user_id, character_id, from_node_id, to_node_id, relation_type, valid_from)
+    CONSTRAINT chk_memory_graph_edges_valid_time CHECK (valid_until IS NULL OR valid_from IS NULL OR valid_until > valid_from)
 );
 
 CREATE INDEX idx_memory_graph_edges_from ON memory_graph_edges(from_node_id);
 CREATE INDEX idx_memory_graph_edges_to ON memory_graph_edges(to_node_id);
 CREATE INDEX idx_memory_graph_edges_active ON memory_graph_edges(user_id, character_id, relation_type, valid_until);
+CREATE UNIQUE INDEX uq_memory_graph_edges_nonnull_valid_from
+ON memory_graph_edges(user_id, character_id, from_node_id, to_node_id, relation_type, valid_from)
+WHERE valid_from IS NOT NULL;
+CREATE UNIQUE INDEX uq_memory_graph_edges_null_valid_from
+ON memory_graph_edges(user_id, character_id, from_node_id, to_node_id, relation_type)
+WHERE valid_from IS NULL;
 
 CREATE TABLE memory_audit_events (
     id BIGINT PRIMARY KEY,

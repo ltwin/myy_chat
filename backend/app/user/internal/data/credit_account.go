@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/jackc/pgx/v5"
@@ -34,14 +35,18 @@ func NewCreditAccountRepo(db *pgxpool.Pool, idGen snowflake.Generator, logger lo
 // Create 创建积分账户
 func (r *creditAccountRepo) Create(ctx context.Context, account *biz.CreditAccount) error {
 	query := `
-		INSERT INTO credit_accounts (user_id, balance, total_charged, total_consumed, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO credit_accounts (
+			user_id, balance, reserved_balance, total_recharged, total_consumed, version, created_at, updated_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 	_, err := r.db.Exec(ctx, query,
 		account.UserID,
 		account.Balance,
-		account.TotalCharged,
+		account.ReservedBalance,
+		account.TotalRecharged,
 		account.TotalConsumed,
+		account.Version,
 		account.CreatedAt,
 		account.UpdatedAt,
 	)
@@ -51,7 +56,7 @@ func (r *creditAccountRepo) Create(ctx context.Context, account *biz.CreditAccou
 // GetByUserID 根据用户ID获取账户
 func (r *creditAccountRepo) GetByUserID(ctx context.Context, userID int64) (*biz.CreditAccount, error) {
 	query := `
-		SELECT user_id, balance, total_charged, total_consumed, created_at, updated_at
+		SELECT user_id, balance, reserved_balance, total_recharged, total_consumed, version, created_at, updated_at
 		FROM credit_accounts
 		WHERE user_id = $1
 	`
@@ -60,8 +65,10 @@ func (r *creditAccountRepo) GetByUserID(ctx context.Context, userID int64) (*biz
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&account.UserID,
 		&account.Balance,
-		&account.TotalCharged,
+		&account.ReservedBalance,
+		&account.TotalRecharged,
 		&account.TotalConsumed,
+		&account.Version,
 		&account.CreatedAt,
 		&account.UpdatedAt,
 	)
@@ -81,16 +88,20 @@ func (r *creditAccountRepo) Update(ctx context.Context, account *biz.CreditAccou
 	query := `
 		UPDATE credit_accounts SET
 			balance = $2,
-			total_charged = $3,
-			total_consumed = $4,
+			reserved_balance = $3,
+			total_recharged = $4,
+			total_consumed = $5,
+			version = $6,
 			updated_at = NOW()
 		WHERE user_id = $1
 	`
 	result, err := r.db.Exec(ctx, query,
 		account.UserID,
 		account.Balance,
-		account.TotalCharged,
+		account.ReservedBalance,
+		account.TotalRecharged,
 		account.TotalConsumed,
+		account.Version,
 	)
 	if err != nil {
 		return err
@@ -104,18 +115,35 @@ func (r *creditAccountRepo) Update(ctx context.Context, account *biz.CreditAccou
 }
 
 // AddCredits 增加积分 (带交易记录)
-func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount int64, reason, refType string, refID int64) error {
+func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) error {
+	if strings.TrimSpace(idempotencyKey) == "" {
+		return biz.ErrIdempotencyKeyMissing
+	}
+
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 
+	var exists bool
+	checkQuery := `SELECT EXISTS(SELECT 1 FROM credit_transactions WHERE idempotency_key = $1)`
+	if err := tx.QueryRow(ctx, checkQuery, idempotencyKey).Scan(&exists); err != nil {
+		return err
+	}
+	if exists {
+		return biz.ErrDuplicateTransaction
+	}
+
 	// 更新账户余额
 	var balanceAfter int64
 	updateQuery := `
 		UPDATE credit_accounts
-		SET balance = balance + $2, total_charged = total_charged + $2, updated_at = NOW()
+		SET
+			balance = balance + $2,
+			total_recharged = total_recharged + $2,
+			version = version + 1,
+			updated_at = NOW()
 		WHERE user_id = $1
 		RETURNING balance
 	`
@@ -131,21 +159,21 @@ func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount
 	transactionID := r.idGen.Generate()
 	insertQuery := `
 		INSERT INTO credit_transactions (
-			id, user_id, type, transaction_type, amount, balance_after,
-			description, reference_type, reference_id, status, created_at
+			id, user_id, transaction_type, amount, balance_after,
+			description, reference_type, reference_id, idempotency_key, status, created_at
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'SUCCESS', NOW())
 	`
 	_, err = tx.Exec(ctx, insertQuery,
 		transactionID,
 		userID,
-		biz.TransactionTypeBonus,
-		"GRANT",
+		biz.TransactionTypeGrant,
 		amount,
 		balanceAfter,
 		reason,
 		refType,
-		refID,
+		nullRefID(refID),
+		idempotencyKey,
 	)
 	if err != nil {
 		return err
@@ -155,7 +183,11 @@ func (r *creditAccountRepo) AddCredits(ctx context.Context, userID int64, amount
 }
 
 // DeductCredits 扣除积分 (带交易记录)
-func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amount int64, reason, refType string, refID int64, idempotencyKey string) error {
+func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) error {
+	if strings.TrimSpace(idempotencyKey) == "" {
+		return biz.ErrIdempotencyKeyMissing
+	}
+
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -163,23 +195,25 @@ func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amo
 	defer tx.Rollback(ctx)
 
 	// 检查幂等性
-	if idempotencyKey != "" {
-		var exists bool
-		checkQuery := `SELECT EXISTS(SELECT 1 FROM credit_transactions WHERE idempotency_key = $1)`
-		err = tx.QueryRow(ctx, checkQuery, idempotencyKey).Scan(&exists)
-		if err != nil {
-			return err
-		}
-		if exists {
-			return biz.ErrDuplicateTransaction
-		}
+	var exists bool
+	checkQuery := `SELECT EXISTS(SELECT 1 FROM credit_transactions WHERE idempotency_key = $1)`
+	err = tx.QueryRow(ctx, checkQuery, idempotencyKey).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return biz.ErrDuplicateTransaction
 	}
 
 	// 检查余额并更新
 	var balanceAfter int64
 	updateQuery := `
 		UPDATE credit_accounts
-		SET balance = balance - $2, total_consumed = total_consumed + $2, updated_at = NOW()
+		SET
+			balance = balance - $2,
+			total_consumed = total_consumed + $2,
+			version = version + 1,
+			updated_at = NOW()
 		WHERE user_id = $1 AND balance >= $2
 		RETURNING balance
 	`
@@ -205,26 +239,21 @@ func (r *creditAccountRepo) DeductCredits(ctx context.Context, userID int64, amo
 	transactionID := r.idGen.Generate()
 	insertQuery := `
 		INSERT INTO credit_transactions (
-			id, user_id, type, transaction_type, amount, balance_after,
+			id, user_id, transaction_type, amount, balance_after,
 			description, reference_type, reference_id, idempotency_key, status, created_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'SUCCESS', NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'SUCCESS', NOW())
 	`
-	var idempKey sql.NullString
-	if idempotencyKey != "" {
-		idempKey = sql.NullString{String: idempotencyKey, Valid: true}
-	}
 	_, err = tx.Exec(ctx, insertQuery,
 		transactionID,
 		userID,
-		biz.TransactionTypeConsume,
-		"SETTLE",
+		biz.TransactionTypeSettle,
 		-amount, // 消费记为负数
 		balanceAfter,
 		reason,
 		refType,
-		refID,
-		idempKey,
+		nullRefID(refID),
+		idempotencyKey,
 	)
 	if err != nil {
 		return err
@@ -248,7 +277,7 @@ func (r *creditAccountRepo) GetTransactions(ctx context.Context, userID int64, l
 		SELECT
 			id,
 			user_id,
-			COALESCE(type, lower(transaction_type)) AS type,
+			transaction_type,
 			amount,
 			balance_after,
 			description,
@@ -270,13 +299,12 @@ func (r *creditAccountRepo) GetTransactions(ctx context.Context, userID int64, l
 	var transactions []*biz.CreditTransaction
 	for rows.Next() {
 		var t biz.CreditTransaction
-		var description, refType, idempKey sql.NullString
-		var refID sql.NullInt64
+		var description, refType, idempKey, refID sql.NullString
 
 		err := rows.Scan(
 			&t.ID,
 			&t.UserID,
-			&t.Type,
+			&t.TransactionType,
 			&t.Amount,
 			&t.BalanceAfter,
 			&description,
@@ -296,7 +324,7 @@ func (r *creditAccountRepo) GetTransactions(ctx context.Context, userID int64, l
 			t.ReferenceType = refType.String
 		}
 		if refID.Valid {
-			t.ReferenceID = refID.Int64
+			t.ReferenceID = refID.String
 		}
 		if idempKey.Valid {
 			t.IdempotencyKey = idempKey.String
@@ -306,6 +334,13 @@ func (r *creditAccountRepo) GetTransactions(ctx context.Context, userID int64, l
 	}
 
 	return transactions, total, rows.Err()
+}
+
+func nullRefID(refID string) sql.NullString {
+	if strings.TrimSpace(refID) == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: strings.TrimSpace(refID), Valid: true}
 }
 
 // Delete 删除积分账户

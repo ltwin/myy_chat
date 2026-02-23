@@ -114,13 +114,17 @@ func (r *userRepo) CreateWithInitialResources(ctx context.Context, user *biz.Use
 	}
 
 	createCreditSQL := `
-		INSERT INTO credit_accounts (user_id, balance, total_charged, total_consumed, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO credit_accounts (
+			user_id, balance, reserved_balance, total_recharged, total_consumed, version, created_at, updated_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 	if _, err := tx.Exec(ctx, createCreditSQL,
 		user.ID,
 		initialCredits,
+		0,
 		initialCredits,
+		0,
 		0,
 		user.CreatedAt,
 		user.UpdatedAt,

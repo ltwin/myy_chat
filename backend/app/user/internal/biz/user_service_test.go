@@ -156,7 +156,10 @@ func (r *mockCreditRepo) Update(ctx context.Context, account *CreditAccount) err
 	return nil
 }
 
-func (r *mockCreditRepo) AddCredits(ctx context.Context, userID int64, amount int64, reason, refType string, refID int64) error {
+func (r *mockCreditRepo) AddCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) error {
+	if idempotencyKey == "" {
+		return ErrIdempotencyKeyMissing
+	}
 	if account, ok := r.accounts[userID]; ok {
 		account.AddCredits(amount)
 		return nil
@@ -164,7 +167,10 @@ func (r *mockCreditRepo) AddCredits(ctx context.Context, userID int64, amount in
 	return ErrCreditAccountNotFound
 }
 
-func (r *mockCreditRepo) DeductCredits(ctx context.Context, userID int64, amount int64, reason, refType string, refID int64, idempotencyKey string) error {
+func (r *mockCreditRepo) DeductCredits(ctx context.Context, userID int64, amount int64, reason, refType, refID, idempotencyKey string) error {
+	if idempotencyKey == "" {
+		return ErrIdempotencyKeyMissing
+	}
 	if account, ok := r.accounts[userID]; ok {
 		return account.DeductCredits(amount)
 	}

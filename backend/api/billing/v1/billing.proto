@@ -72,9 +72,9 @@ message GetBalanceRequest {
 
 message GetBalanceResponse {
   int64 user_id = 1;
-  double balance = 2;           // 当前余额
-  double total_charged = 3;     // 累计充值
-  double total_consumed = 4;    // 累计消费
+  int64 balance = 2;            // 当前余额（积分整数单位）
+  int64 total_recharged = 3;    // 累计充值（积分整数单位）
+  int64 total_consumed = 4;     // 累计消费（积分整数单位）
   google.protobuf.Timestamp updated_at = 5;
 }
 
@@ -84,7 +84,7 @@ message GetTransactionsRequest {
   int64 user_id = 1;
   int32 page = 2;           // 页码，从1开始
   int32 page_size = 3;      // 每页数量，默认20，最大100
-  string type = 4;          // 交易类型过滤: charge, consume, refund, bonus
+  string transaction_type = 4;  // 交易类型过滤: GRANT, RESERVE, SETTLE, RELEASE, RECHARGE, REFUND, ADJUST
   google.protobuf.Timestamp start_time = 5;  // 开始时间
   google.protobuf.Timestamp end_time = 6;    // 结束时间
 }
@@ -99,12 +99,12 @@ message GetTransactionsResponse {
 message Transaction {
   int64 id = 1;
   int64 user_id = 2;
-  string type = 3;              // charge, consume, refund, bonus
-  double amount = 4;            // 交易金额 (正数为增加，负数为减少)
-  double balance_after = 5;     // 交易后余额
+  string transaction_type = 3;  // GRANT, RESERVE, SETTLE, RELEASE, RECHARGE, REFUND, ADJUST
+  int64 amount = 4;             // 交易金额 (正数为增加，负数为减少)
+  int64 balance_after = 5;      // 交易后余额
   string description = 6;       // 交易描述
   string reference_type = 7;    // 关联类型: order, llm_call, admin
-  int64 reference_id = 8;       // 关联ID
+  string reference_id = 8;      // 关联ID（字符串）
   google.protobuf.Timestamp created_at = 9;
 }
 
@@ -122,9 +122,9 @@ message CreditPackage {
   int64 id = 1;
   string name = 2;
   string description = 3;
-  double credits = 4;           // 积分数量
+  int64 credits = 4;            // 积分数量
   double price_cny = 5;         // 价格（人民币）
-  double bonus_credits = 6;     // 赠送积分
+  int64 bonus_credits = 6;      // 赠送积分
   bool is_active = 7;
   int32 sort_order = 8;
 }
@@ -179,8 +179,8 @@ message SyncLLMCostRequest {
 
 message SyncLLMCostResponse {
   bool success = 1;
-  double credits_deducted = 2;          // 扣除的积分数量
-  double balance_after = 3;             // 扣除后余额
+  int64 credits_deducted = 2;           // 扣除的积分数量
+  int64 balance_after = 3;              // 扣除后余额
   string error_message = 4;             // 错误信息 (如余额不足)
 }
 
@@ -188,16 +188,16 @@ message SyncLLMCostResponse {
 
 message DeductCreditsRequest {
   int64 user_id = 1;
-  double amount = 2;                    // 扣除积分数量
+  int64 amount = 2;                     // 扣除积分数量（整数）
   string reason = 3;                    // 扣除原因
   string reference_type = 4;            // 关联类型
-  int64 reference_id = 5;               // 关联ID
+  string reference_id = 5;              // 关联ID（字符串）
   string idempotency_key = 6;           // 幂等键
 }
 
 message DeductCreditsResponse {
   bool success = 1;
-  double balance_after = 2;
+  int64 balance_after = 2;
   string error_message = 3;
 }
 
@@ -205,15 +205,15 @@ message DeductCreditsResponse {
 
 message AddCreditsRequest {
   int64 user_id = 1;
-  double amount = 2;                    // 增加积分数量
+  int64 amount = 2;                     // 增加积分数量（整数）
   string reason = 3;                    // 原因: charge, bonus, refund, admin
   string reference_type = 4;            // 关联类型
-  int64 reference_id = 5;               // 关联ID (如订单ID)
+  string reference_id = 5;              // 关联ID（字符串）
   string idempotency_key = 6;           // 幂等键
 }
 
 message AddCreditsResponse {
   bool success = 1;
-  double balance_after = 2;
+  int64 balance_after = 2;
   string error_message = 3;
 }
