@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"os"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -16,28 +15,24 @@ import (
 
 	userv1 "github.com/myy-chat/backend/api/user/v1"
 	"github.com/myy-chat/backend/app/conversation/internal/biz"
+	"github.com/myy-chat/backend/app/conversation/internal/conf"
 )
 
 const (
 	defaultUserServiceGRPCAddr = "127.0.0.1:9000"
-	userServiceGRPCAddrEnv     = "USER_SERVICE_GRPC_ADDR"
 )
 
 // creditClient 积分服务客户端实现
 // 通过 gRPC 调用 User Service 的积分接口
 type creditClient struct {
 	log    *log.Helper
-	conn   *grpc.ClientConn
 	client userv1.UserServiceClient
 }
 
 // NewCreditClient 创建积分客户端
-func NewCreditClient(logger log.Logger) (biz.CreditService, func(), error) {
+func NewCreditClient(c *conf.Data, logger log.Logger) (biz.CreditService, func(), error) {
 	helper := log.NewHelper(logger)
-	addr := strings.TrimSpace(os.Getenv(userServiceGRPCAddrEnv))
-	if addr == "" {
-		addr = defaultUserServiceGRPCAddr
-	}
+	addr := resolveUserServiceGRPCAddr(c)
 
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -53,7 +48,6 @@ func NewCreditClient(logger log.Logger) (biz.CreditService, func(), error) {
 
 	return &creditClient{
 		log:    helper,
-		conn:   conn,
 		client: userv1.NewUserServiceClient(conn),
 	}, cleanup, nil
 }
@@ -110,4 +104,13 @@ func buildConversationIdempotencyKey(userID int64, reason string, credits int64)
 		normalizedReason = "conversation"
 	}
 	return fmt.Sprintf("conv-deduct:%d:%s:%d", userID, normalizedReason, credits)
+}
+
+func resolveUserServiceGRPCAddr(c *conf.Data) string {
+	if c != nil && c.GetServices() != nil {
+		if addr := strings.TrimSpace(c.GetServices().GetUserGrpcAddr()); addr != "" {
+			return addr
+		}
+	}
+	return defaultUserServiceGRPCAddr
 }
